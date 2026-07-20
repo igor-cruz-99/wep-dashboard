@@ -11,6 +11,10 @@
  */
 import { createClient } from '@supabase/supabase-js'
 
+// Declarado localmente para não depender de @types/node estar carregado no
+// contexto em que a Vercel compila as funções (evita "Cannot find name 'process'").
+declare const process: { env: Record<string, string | undefined> }
+
 const DATA_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE
 const AUTH_URL = process.env.SUPABASE_AUTH_URL ?? process.env.VITE_SUPABASE_AUTH_URL
