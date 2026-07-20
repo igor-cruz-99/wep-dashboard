@@ -27,6 +27,9 @@ const ALLOWED_RPC = new Set([
   'fn_serie_diaria',
   'fn_trafego',
   'fn_paginas',
+  'fn_pesquisa_perfil',
+  'fn_seal_resumo',
+  'fn_seal_compradores',
 ])
 
 interface Req {
@@ -64,6 +67,14 @@ async function getUserEmail(token: string): Promise<string | null> {
   }
 }
 
+/**
+ * Interruptor de desenvolvimento — pula a validação de sessão para ajustar o
+ * visual sem login. A trava `NODE_ENV !== 'production'` é o que torna isso
+ * impossível de ligar na Vercel, mesmo que a variável seja definida lá por engano.
+ */
+const DEV_SKIP_AUTH =
+  process.env.DEV_SKIP_AUTH === '1' && process.env.NODE_ENV !== 'production'
+
 /** Email está na allowlist (por email exato ou por domínio)? */
 function isAllowed(email: string): boolean {
   if (ALLOWED_EMAILS.includes(email)) return true
@@ -79,26 +90,28 @@ export default async function handler(req: Req, res: Res) {
   }
 
   // Sem allowlist configurada, ninguém entra (falha fechada, nunca aberta).
-  if (ALLOWED_EMAILS.length === 0 && ALLOWED_DOMAINS.length === 0) {
+  if (!DEV_SKIP_AUTH && ALLOWED_EMAILS.length === 0 && ALLOWED_DOMAINS.length === 0) {
     return res.status(500).json({
       error:
         'Allowlist não configurada. Defina DASHBOARD_ALLOWED_EMAILS e/ou DASHBOARD_ALLOWED_DOMAINS.',
     })
   }
 
-  // 1) Token do usuário
-  const raw = req.headers.authorization
-  const header = Array.isArray(raw) ? raw[0] : raw
-  const token = header?.startsWith('Bearer ') ? header.slice(7) : ''
-  if (!token) return res.status(401).json({ error: 'Sem token de sessão.' })
+  if (!DEV_SKIP_AUTH) {
+    // 1) Token do usuário
+    const raw = req.headers.authorization
+    const header = Array.isArray(raw) ? raw[0] : raw
+    const token = header?.startsWith('Bearer ') ? header.slice(7) : ''
+    if (!token) return res.status(401).json({ error: 'Sem token de sessão.' })
 
-  // 2) Validação no projeto de auth
-  const email = await getUserEmail(token)
-  if (!email) return res.status(401).json({ error: 'Sessão inválida ou expirada.' })
+    // 2) Validação no projeto de auth
+    const email = await getUserEmail(token)
+    if (!email) return res.status(401).json({ error: 'Sessão inválida ou expirada.' })
 
-  // 3) Autorização — logar não basta, tem que estar na allowlist
-  if (!isAllowed(email)) {
-    return res.status(403).json({ error: 'Sua conta não tem acesso a este painel.' })
+    // 3) Autorização — logar não basta, tem que estar na allowlist
+    if (!isAllowed(email)) {
+      return res.status(403).json({ error: 'Sua conta não tem acesso a este painel.' })
+    }
   }
 
   // 3) Consulta ao projeto de dados com service_role (só no servidor)

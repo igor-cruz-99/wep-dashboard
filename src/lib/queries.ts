@@ -1,9 +1,15 @@
 import { supabaseAuth } from './supabase'
+import { DEV_SKIP_AUTH } from './devAuth'
 import type {
   DailyPoint,
   FunnelStage,
   Kpi,
   PageRow,
+  PerfilDatum,
+  PesquisaPerfil,
+  SealComprador,
+  SealResumo,
+  SealSituacao,
   TrafficRow,
   Filters,
 } from '../types'
@@ -23,14 +29,20 @@ function rpcParams(filters: Filters) {
  * nunca fala direto com o Supabase de dados.
  */
 async function callApi<T>(fn: string, params?: Record<string, unknown>): Promise<T> {
-  if (!supabaseAuth) throw new Error('Auth não configurado')
-  const { data } = await supabaseAuth.auth.getSession()
-  const token = data.session?.access_token
-  if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+  let token: string | undefined
+  if (!DEV_SKIP_AUTH) {
+    if (!supabaseAuth) throw new Error('Auth não configurado')
+    const { data } = await supabaseAuth.auth.getSession()
+    token = data.session?.access_token
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+  }
 
   const res = await fetch('/api/dashboard', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ fn, params }),
   })
   const json = (await res.json().catch(() => ({}))) as { data?: T; error?: string }
@@ -68,6 +80,17 @@ interface TrafegoRow {
   body: number
 }
 interface PaginaRow { pagina: string; page_views: number; checkouts: number; vendas: number }
+interface PerfilRow { dimensao: string; categoria: string; total: number }
+interface SealRow { situacao: string; alunos: number; valor_total: number }
+interface SealCompradorRow {
+  email: string
+  nome: string | null
+  situacao: string
+  utm_source: string | null
+  utm_campaign: string | null
+  utm_medium: string | null
+  utm_content: string | null
+}
 
 // ── KPIs ──────────────────────────────────────────────────────────────────
 export async function fetchKpis(filters: Filters): Promise<Kpi[]> {
@@ -151,6 +174,72 @@ export async function fetchPages(filters: Filters): Promise<PageRow[]> {
     checkout: Number(r.checkouts),
     vendas: Number(r.vendas),
     pesquisa: 0, // pesquisa não é por página no modelo atual — ver pendência
+  }))
+}
+
+// ── Perfil das pesquisas (4 gráficos) ───────────────────────────────────────
+const PERFIL_VAZIO: PesquisaPerfil = { renda: [], idade: [], profissao: [], genero: [] }
+
+export async function fetchPesquisaPerfil(filters: Filters): Promise<PesquisaPerfil> {
+  let rows: PerfilRow[]
+  try {
+    rows = (await callApi<PerfilRow[]>('fn_pesquisa_perfil', rpcParams(filters))) ?? []
+  } catch (err) {
+    // Bloco opcional: se a RPC ainda não foi aplicada no banco, não derruba o
+    // painel — os gráficos mostram "sem respostas" e o resto carrega normal.
+    console.warn('fn_pesquisa_perfil indisponível:', (err as Error)?.message)
+    return PERFIL_VAZIO
+  }
+  // A RPC já devolve ordenado por total desc; só separamos por dimensão.
+  const pick = (dim: string): PerfilDatum[] =>
+    rows.filter((r) => r.dimensao === dim).map((r) => ({ categoria: r.categoria, total: Number(r.total) }))
+  return {
+    renda: pick('renda'),
+    idade: pick('idade'),
+    profissao: pick('profissao'),
+    genero: pick('genero'),
+  }
+}
+
+// ── SEAL: situação de pagamento por aluno (2 cards) ─────────────────────────
+const SEAL_VAZIO: SealResumo = {
+  quitou: { alunos: 0, valorTotal: 0 },
+  reserva: { alunos: 0, valorTotal: 0 },
+}
+
+export async function fetchSealResumo(): Promise<SealResumo> {
+  let rows: SealRow[]
+  try {
+    // Sem filtros: os cards mostram sempre o total do produto SEAL.
+    rows = (await callApi<SealRow[]>('fn_seal_resumo')) ?? []
+  } catch (err) {
+    // Bloco opcional: se a RPC/view ainda não foi aplicada, não derruba o painel.
+    console.warn('fn_seal_resumo indisponível:', (err as Error)?.message)
+    return SEAL_VAZIO
+  }
+  const find = (s: string): SealSituacao => {
+    const r = rows.find((x) => x.situacao === s)
+    return { alunos: Number(r?.alunos ?? 0), valorTotal: Number(r?.valor_total ?? 0) }
+  }
+  return { quitou: find('quitou'), reserva: find('reserva') }
+}
+
+export async function fetchSealCompradores(): Promise<SealComprador[]> {
+  let rows: SealCompradorRow[]
+  try {
+    rows = (await callApi<SealCompradorRow[]>('fn_seal_compradores')) ?? []
+  } catch (err) {
+    console.warn('fn_seal_compradores indisponível:', (err as Error)?.message)
+    return []
+  }
+  return rows.map((r) => ({
+    email: r.email,
+    nome: r.nome,
+    situacao: r.situacao,
+    utmSource: r.utm_source,
+    utmCampaign: r.utm_campaign,
+    utmMedium: r.utm_medium,
+    utmContent: r.utm_content,
   }))
 }
 

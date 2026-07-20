@@ -13,20 +13,6 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
-/** Escudo dourado em contorno (ícone do topo). */
-function Shield() {
-  return (
-    <svg width="26" height="28" viewBox="0 0 24 26" fill="none" aria-hidden>
-      <path
-        d="M12 1.5 2.5 5.4v7.1c0 6 4 10.4 9.5 12.5 5.5-2.1 9.5-6.5 9.5-12.5V5.4L12 1.5Z"
-        stroke="#e8b05c"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 export function Header({
   filters,
   tags,
@@ -40,9 +26,7 @@ export function Header({
   return (
     <header className="flex items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card">
-          <Shield />
-        </div>
+        <img src="/logo.png" alt="" className="h-12 w-auto shrink-0" />
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-muted">
             Dashboard

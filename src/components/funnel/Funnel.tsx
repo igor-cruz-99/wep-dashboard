@@ -1,5 +1,5 @@
 import type { FunnelStage } from '../../types'
-import { formatBRL, formatInt } from '../../utils/format'
+import { formatBRL, formatDec1, formatInt, formatPct2 } from '../../utils/format'
 
 // Degradê creme: quase branco (topo/Investimento) → taupe (base/Vendas).
 const TOP = { r: 245, g: 239, b: 224 } // #f5efe0
@@ -12,11 +12,27 @@ function creamAt(t: number) {
   return `rgb(${r} ${g} ${b})`
 }
 
+/** Métrica derivada exibida numa caixa sobreposta à borda entre dois degraus. */
+interface OverlayMetric {
+  label: string
+  /** Índice do degrau em cuja borda inferior a caixa é ancorada. */
+  boundary: number
+  side: 'left' | 'right'
+  /** Já formatado, ou null quando o denominador é zero (mostra "—"). */
+  text: string | null
+}
+
+/** Divisão protegida: sem denominador não há métrica (≠ métrica igual a zero). */
+const safe = (a: number, b: number) => (b > 0 ? a / b : null)
+const fmt = (v: number | null, f: (n: number) => string) => (v === null ? null : f(v))
+
 /**
  * Funil contínuo: cada degrau é um trapézio que vai da largura do topo até a
  * largura do topo do degrau seguinte — cantos alinhados na vertical.
+ * Sobre as bordas entre os degraus flutuam as métricas derivadas (CPM, CTR, …),
+ * alternando esquerda/direita.
  */
-export function Funnel({ stages }: { stages: FunnelStage[] }) {
+export function Funnel({ stages, cac }: { stages: FunnelStage[]; cac?: number }) {
   const n = stages.length
   // Larguras (em % do container) do topo de cada degrau; TOP_MIN = base do último.
   const TOP_MAX = 100
@@ -24,8 +40,10 @@ export function Funnel({ stages }: { stages: FunnelStage[] }) {
   const widthAt = (index: number) =>
     TOP_MAX - (index / n) * (TOP_MAX - TOP_MIN)
 
+  const metrics = buildMetrics(stages, cac)
+
   return (
-    <div className="flex w-full flex-col items-center gap-1">
+    <div className="flex w-full flex-col items-center gap-1 px-7">
       {stages.map((stage, i) => {
         const t = i / (n - 1)
         const topW = widthAt(i)
@@ -38,22 +56,81 @@ export function Funnel({ stages }: { stages: FunnelStage[] }) {
         const value =
           stage.format === 'brl' ? formatBRL(stage.value) : formatInt(stage.value)
         return (
-          <div
-            key={stage.label}
-            className="flex w-full flex-col items-center justify-center py-3.5 text-center"
-            style={{
-              background: creamAt(t),
-              color: '#2b2014',
-              clipPath: `polygon(${tl}% 0, ${tr}% 0, ${br}% 100%, ${bl}% 100%)`,
-            }}
-          >
-            <span className="text-[11px] font-extrabold uppercase tracking-[0.15em] opacity-80">
-              {stage.label}
-            </span>
-            <span className="text-xl font-bold leading-tight">{value}</span>
+          // Wrapper posicionado: o degrau tem clip-path, então as caixas não
+          // podem ser filhas dele (seriam recortadas junto).
+          <div key={stage.label} className="relative w-full">
+            <div
+              className="flex w-full flex-col items-center justify-center py-3.5 text-center"
+              style={{
+                background: creamAt(t),
+                color: '#2b2014',
+                clipPath: `polygon(${tl}% 0, ${tr}% 0, ${br}% 100%, ${bl}% 100%)`,
+              }}
+            >
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.15em] opacity-80">
+                {stage.label}
+              </span>
+              <span className="text-xl font-bold leading-tight">{value}</span>
+            </div>
+
+            {metrics
+              .filter((m) => m.boundary === i)
+              .map((m) => (
+                <div
+                  key={m.label}
+                  className="absolute bottom-0 z-10 -translate-x-1/2 translate-y-1/2 whitespace-nowrap rounded-md px-2.5 py-1 text-center shadow-md shadow-black/30"
+                  style={{
+                    // Creme do topo do funil (mesma cor da camada "Investimento").
+                    background: `rgb(${TOP.r} ${TOP.g} ${TOP.b} / 0.9)`,
+                    color: '#2b2014',
+                    left: `${m.side === 'left' ? bl : br}%`,
+                  }}
+                >
+                  <span className="block text-[9px] font-semibold uppercase tracking-wider opacity-70">
+                    {m.label}
+                  </span>
+                  <span className="block text-xs font-bold leading-tight">
+                    {m.text ?? '—'}
+                  </span>
+                </div>
+              ))}
           </div>
         )
       })}
     </div>
   )
+}
+
+/**
+ * Todos os insumos vêm do próprio funil (fn_funil); só o CAC é reaproveitado
+ * de fn_kpis para não recalcular a mesma conta em dois lugares.
+ */
+function buildMetrics(stages: FunnelStage[], cac?: number): OverlayMetric[] {
+  const at = (label: string) =>
+    Number(stages.find((s) => s.label === label)?.value ?? 0)
+
+  const investimento = at('Investimento')
+  const alcance = at('Alcance')
+  const impressoes = at('Impressões')
+  const cliques = at('Cliques')
+  const pageViews = at('Page Views')
+  const vendas = at('Vendas')
+
+  const pctOf = (v: number | null) => (v === null ? null : v * 100)
+
+  return [
+    // Alcance → Impressões
+    { label: 'Frequência', boundary: 1, side: 'right', text: fmt(safe(impressoes, alcance), formatDec1) },
+    // Impressões → Cliques
+    { label: 'CPM', boundary: 2, side: 'left', text: fmt(safe(investimento * 1000, impressoes), formatBRL) },
+    { label: 'CTR', boundary: 2, side: 'right', text: fmt(pctOf(safe(cliques, impressoes)), formatPct2) },
+    // Cliques → Page Views
+    { label: 'CPC', boundary: 3, side: 'left', text: fmt(safe(investimento, cliques), formatBRL) },
+    { label: 'Connect Rate', boundary: 3, side: 'right', text: fmt(pctOf(safe(pageViews, cliques)), formatPct2) },
+    // Page Views → Checkouts
+    { label: 'CPLV', boundary: 4, side: 'left', text: fmt(safe(investimento, pageViews), formatBRL) },
+    { label: 'Conversão Página', boundary: 4, side: 'right', text: fmt(pctOf(safe(vendas, pageViews)), formatPct2) },
+    // Checkouts → Vendas
+    { label: 'CAC', boundary: 5, side: 'left', text: cac && cac > 0 ? formatBRL(cac) : null },
+  ]
 }

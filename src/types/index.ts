@@ -53,6 +53,43 @@ export interface PageRow {
   pesquisa: number
 }
 
+/** Uma fatia/barra de um gráfico de perfil (categoria + contagem). */
+export interface PerfilDatum {
+  categoria: string
+  total: number
+}
+
+/** Distribuições das respostas da pesquisa (roadmap item 3). */
+export interface PesquisaPerfil {
+  renda: PerfilDatum[]
+  idade: PerfilDatum[]
+  profissao: PerfilDatum[]
+  genero: PerfilDatum[]
+}
+
+/** Uma situação de pagamento do SEAL (card): quantos alunos e valor somado. */
+export interface SealSituacao {
+  alunos: number
+  valorTotal: number
+}
+
+/** Resumo do SEAL para os 2 cards (roadmap item 2). */
+export interface SealResumo {
+  quitou: SealSituacao
+  reserva: SealSituacao
+}
+
+/** Linha da tabela de compradores SEAL (nome, email, UTMs). */
+export interface SealComprador {
+  email: string
+  nome: string | null
+  situacao: string
+  utmSource: string | null
+  utmCampaign: string | null
+  utmMedium: string | null
+  utmContent: string | null
+}
+
 /** Filtros globais do painel. */
 export interface Filters {
   tag: string | null

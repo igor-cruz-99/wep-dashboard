@@ -2,6 +2,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { useAuth } from './hooks/useAuth'
 import { supabaseAuth } from './lib/supabase'
+import { DEV_SKIP_AUTH } from './lib/devAuth'
 
 function Loader() {
   return (
@@ -16,11 +17,11 @@ function App() {
 
   const logout = () => supabaseAuth?.auth.signOut()
 
-  if (loading) return <Loader />
-  if (!session) return <Login />
+  if (loading && !DEV_SKIP_AUTH) return <Loader />
+  if (!session && !DEV_SKIP_AUTH) return <Login />
 
   // Projeto de auth contém só os funcionários → logado = autorizado.
-  return <Dashboard userEmail={session.user.email ?? undefined} onLogout={logout} />
+  return <Dashboard userEmail={session?.user.email ?? undefined} onLogout={logout} />
 }
 
 export default App

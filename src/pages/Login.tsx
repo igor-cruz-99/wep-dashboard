@@ -2,20 +2,6 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabaseAuth, isAuthConfigured } from '../lib/supabase'
 
-/** Escudo dourado (mesmo do cabeçalho). */
-function Shield() {
-  return (
-    <svg width="40" height="44" viewBox="0 0 24 26" fill="none" aria-hidden>
-      <path
-        d="M12 1.5 2.5 5.4v7.1c0 6 4 10.4 9.5 12.5 5.5-2.1 9.5-6.5 9.5-12.5V5.4L12 1.5Z"
-        stroke="#e8b05c"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 export function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -56,9 +42,11 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-line bg-card">
-            <Shield />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Workshop Estrategista Patrimonial"
+            className="h-24 w-auto"
+          />
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-muted">
               Dashboard

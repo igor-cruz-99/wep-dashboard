@@ -5,6 +5,9 @@ import { ChartCard } from '../components/charts/ChartCard'
 import { Funnel } from '../components/funnel/Funnel'
 import { TrafficTable } from '../components/tables/TrafficTable'
 import { PagesTable } from '../components/tables/PagesTable'
+import { PesquisaCharts } from '../components/pesquisa/PesquisaCharts'
+import { SealCards } from '../components/seal/SealCards'
+import { SealBuyersTable } from '../components/seal/SealBuyersTable'
 import { Panel, SectionTitle } from '../components/ui/Panel'
 import { fetchTags } from '../lib/queries'
 import type { TagWindow } from '../lib/queries'
@@ -207,7 +210,10 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
 
             <Panel className="p-5">
               <SectionTitle title="Funil de conversão" titleClassName="text-muted uppercase font-semibold" className="mb-5 text-center" />
-              <Funnel stages={data.funnel} />
+              <Funnel
+                stages={data.funnel}
+                cac={data.kpis.find((k) => k.id === 'cac')?.value}
+              />
             </Panel>
 
             <div className="flex flex-col gap-4">
@@ -229,10 +235,23 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
             </div>
           </div>
 
-          {/* Tabelas */}
+          {/* Tabelas + Pesquisa + SEAL */}
           <div className="mt-6 flex flex-col gap-6">
             <TrafficTable rows={data.traffic} />
             <PagesTable rows={data.pages} />
+            <PesquisaCharts perfil={data.perfil} />
+
+            {/* SEAL — situação de pagamento + compradores */}
+            <div className="flex flex-col gap-4">
+              <SectionTitle overline="SEAL" title="Situação de pagamento" />
+              <SealCards
+                seal={data.seal}
+                investimento={
+                  data.funnel.find((s) => s.label === 'Investimento')?.value ?? 0
+                }
+              />
+              <SealBuyersTable rows={data.sealCompradores} />
+            </div>
           </div>
         </>
       )}

@@ -3,10 +3,23 @@ import {
   fetchFunnel,
   fetchKpis,
   fetchPages,
+  fetchPesquisaPerfil,
+  fetchSealCompradores,
+  fetchSealResumo,
   fetchSeries,
   fetchTraffic,
 } from '../lib/queries'
-import type { DailyPoint, Filters, FunnelStage, Kpi, PageRow, TrafficRow } from '../types'
+import type {
+  DailyPoint,
+  Filters,
+  FunnelStage,
+  Kpi,
+  PageRow,
+  PesquisaPerfil,
+  SealComprador,
+  SealResumo,
+  TrafficRow,
+} from '../types'
 
 export interface DashboardData {
   kpis: Kpi[]
@@ -19,6 +32,9 @@ export interface DashboardData {
   }
   traffic: TrafficRow[]
   pages: PageRow[]
+  perfil: PesquisaPerfil
+  seal: SealResumo
+  sealCompradores: SealComprador[]
 }
 
 interface State {
@@ -51,10 +67,17 @@ export function useDashboardData(filters: Filters): State {
       fetchSeries(filters),
       fetchTraffic(filters),
       fetchPages(filters),
+      fetchPesquisaPerfil(filters),
+      fetchSealResumo(),
+      fetchSealCompradores(),
     ])
-      .then(([kpis, funnel, series, traffic, pages]) => {
+      .then(([kpis, funnel, series, traffic, pages, perfil, seal, sealCompradores]) => {
         if (cancelled) return
-        setState({ data: { kpis, funnel, series, traffic, pages }, loading: false, error: null })
+        setState({
+          data: { kpis, funnel, series, traffic, pages, perfil, seal, sealCompradores },
+          loading: false,
+          error: null,
+        })
       })
       .catch((err) => {
         if (cancelled) return
