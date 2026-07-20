@@ -35,16 +35,36 @@ interface Res {
   json: (body: unknown) => void
 }
 
-/** Pergunta ao projeto de auth se o token pertence a um usuário válido. */
-async function isValidToken(token: string): Promise<boolean> {
+// Quem pode acessar o painel. O login com Google cria conta automaticamente,
+// então "estar logado" NÃO basta — é preciso estar autorizado aqui.
+const ALLOWED_EMAILS = (process.env.DASHBOARD_ALLOWED_EMAILS ?? '')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean)
+const ALLOWED_DOMAINS = (process.env.DASHBOARD_ALLOWED_DOMAINS ?? '')
+  .split(',')
+  .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+  .filter(Boolean)
+
+/** Devolve o email do dono do token, ou null se o token for inválido. */
+async function getUserEmail(token: string): Promise<string | null> {
   try {
     const r = await fetch(`${AUTH_URL}/auth/v1/user`, {
       headers: { apikey: AUTH_ANON as string, Authorization: `Bearer ${token}` },
     })
-    return r.ok
+    if (!r.ok) return null
+    const user = (await r.json()) as { email?: string }
+    return user.email?.toLowerCase() ?? null
   } catch {
-    return false
+    return null
   }
+}
+
+/** Email está na allowlist (por email exato ou por domínio)? */
+function isAllowed(email: string): boolean {
+  if (ALLOWED_EMAILS.includes(email)) return true
+  const domain = email.split('@')[1] ?? ''
+  return ALLOWED_DOMAINS.includes(domain)
 }
 
 export default async function handler(req: Req, res: Res) {
@@ -54,6 +74,14 @@ export default async function handler(req: Req, res: Res) {
     return res.status(500).json({ error: 'Servidor sem as variáveis de ambiente configuradas.' })
   }
 
+  // Sem allowlist configurada, ninguém entra (falha fechada, nunca aberta).
+  if (ALLOWED_EMAILS.length === 0 && ALLOWED_DOMAINS.length === 0) {
+    return res.status(500).json({
+      error:
+        'Allowlist não configurada. Defina DASHBOARD_ALLOWED_EMAILS e/ou DASHBOARD_ALLOWED_DOMAINS.',
+    })
+  }
+
   // 1) Token do usuário
   const raw = req.headers.authorization
   const header = Array.isArray(raw) ? raw[0] : raw
@@ -61,8 +89,12 @@ export default async function handler(req: Req, res: Res) {
   if (!token) return res.status(401).json({ error: 'Sem token de sessão.' })
 
   // 2) Validação no projeto de auth
-  if (!(await isValidToken(token))) {
-    return res.status(401).json({ error: 'Sessão inválida ou expirada.' })
+  const email = await getUserEmail(token)
+  if (!email) return res.status(401).json({ error: 'Sessão inválida ou expirada.' })
+
+  // 3) Autorização — logar não basta, tem que estar na allowlist
+  if (!isAllowed(email)) {
+    return res.status(403).json({ error: 'Sua conta não tem acesso a este painel.' })
   }
 
   // 3) Consulta ao projeto de dados com service_role (só no servidor)
