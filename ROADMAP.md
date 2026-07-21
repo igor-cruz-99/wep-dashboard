@@ -1,103 +1,118 @@
-# Roadmap — o que falta (~20% do projeto)
+# Roadmap
 
-> Estado atual: painel no ar em https://wep-dashboard-xi.vercel.app
+> Painel no ar em https://wep-dashboard-xi.vercel.app
 > Ver `README.md` para a arquitetura e `sql/` para os scripts (numerados na ordem de execução).
 
 ---
 
-## 1. Métricas sobrepostas no funil de conversão
+## ✅ Concluído
 
-Caixas brancas **sobrepostas nas bordas entre as etapas** do funil, alternando
-esquerda/direita (referência visual: quadrados brancos "flutuando" sobre o funil).
+### 1. Métricas sobrepostas no funil
+Caixas creme flutuando nas bordas entre as etapas, alternando esquerda/direita:
+**Frequência, CPM, CTR, CPC, Connect Rate, CPLV, Conversão Página** e **CAC**.
+Tudo calculado no front a partir da `fn_funil` (sem SQL novo); o CAC é reaproveitado
+da `fn_kpis`. Divisão por zero mostra `—` (não `R$ 0,00`, que pareceria dado real).
 
-### Fórmulas
+### 2. SEAL — situação de pagamento (`sql/09` + `sql/14`)
+Agrupado por **email**, considerando `status = 'paid'`:
+- pagou **Complemento** ou **Seal®** integral → **quitou**
+- só a **Taxa de Reserva** → **só reserva**
 
-| Métrica | Fórmula | Lado | Entre as etapas |
-|---|---|---|---|
-| **Frequência** | Impressões ÷ Alcance | direita | Alcance → Impressões |
-| **CPM** | (Investimento ÷ Impressões) × 1000 | esquerda | Impressões → Cliques |
-| **CTR** | Cliques ÷ Impressões | direita | Impressões → Cliques |
-| **CPC** | Investimento ÷ Cliques | esquerda | Cliques → Page Views |
-| **Connect Rate** | Page Views ÷ Cliques | direita | Cliques → Page Views |
-| **CPLV** | Investimento ÷ Page Views | esquerda | Page Views → Checkouts |
-| **Conversão Página** | Vendas ÷ Page Views | direita | Page Views → Checkouts |
-| **CAC** | (substitui o antigo "CPL" — usar o CAC já calculado) | esquerda | Checkouts → Vendas |
+Entrega: 2 cards (Quitaram / Só reserva) + **CAC SEAL** (investimento ÷ vendas
+completas) + tabela de compradores com nome, email e UTMs. Os UTMs vêm da venda,
+com fallback pelo email no pré-checkout (`wep_checkout`) quando vierem vazios.
 
-### Notas de implementação
-- Todos os insumos **já vêm** da RPC `fn_funil` (investimento, alcance, impressões,
-  cliques, page views, checkouts, vendas) — dá para calcular no front, sem SQL novo.
-- O **CAC** já existe em `fn_kpis` (investimento ÷ vendas). Reaproveitar, não recalcular.
-- Formatação: `CPM/CPC/CPLV/CAC` em R$; `Frequência` em número (1,9);
-  `CTR/Connect Rate/Conversão Página` em %.
-- Cuidado com divisão por zero (o painel já tem esse padrão nas tabelas).
+**Filtra por período** pela data da compra (`sql/14`). A classificação considera só
+as compras dentro do período — quem pagou reserva em março e complemento em maio
+aparece como "só reserva" num filtro que pegue apenas março.
+
+### 3. Gráficos das respostas das pesquisas (`sql/08`)
+Grid 2×2: **Renda** e **Profissão** em barras horizontais (rótulo `valor (%)`),
+**Idade** em rosca e **Gênero** em pizza, ambas com linha-guia. No título, o total
+de respostas e o % sobre os leads: `8 (114% ↗)`.
+
+### 4. Captação / Leads (`sql/10` a `sql/13`)
+Tabela `mkt_wep.wep_cadastro` (nome, telefone, UTMs, tag, data) para a nova página
+de captação. A partir dela:
+- **KPI Leads** com meta vinda de `wep_tags.meta_leads`
+- **Coluna Leads** em Tráfego (atribuída por UTM nos 3 níveis) e em Páginas (`utm_pagina`)
+- Gráfico **Leads por dia | Conversão** (vendas ÷ leads)
+
+### 5. Ajustes de layout e performance
+- **6 KPIs** na ordem: Investimento → Leads → Vendas Ingressos → CAC → Entrada Grupo
+  → Qualificação. Faturamento removido. Investimento com cor invertida
+  (0–100% verde; acima de 100% vira laranja/vermelho).
+- Gráficos **combo** barra+linha com bolinha colorida ao lado de cada série.
+- **Conversão Checkout por dia** (nome corrigido — a métrica é Vendas ÷ Checkouts).
+- **Logo, favicon e título da aba** — logo otimizada de 577 KB para 20 KB (−96%)
+  e favicon dedicado de 3 KB.
 
 ---
 
-## 2. View do produto principal (SEAL) — `core.vendas_pagarme`
+## 🔴 Pendência de segurança
 
-### Origem
-Tabela `core.vendas_pagarme`. Colunas relevantes:
+**Rotacionar a `service_role`** do projeto de dados (foi exposta em conversa).
+O formato JWT antigo derruba anon + service_role juntas → quebraria o Quartavia
+e as automações. Ideal: criar uma **secret key dedicada** (`sb_secret_*`).
+Ao trocar, atualizar em **dois lugares**: `.env.local` e as Environment Variables
+da Vercel.
+
+---
+
+## 🟡 Limitações conhecidas
+
+- **Coluna "Qualificação"** (tabela de tráfego): sempre zero. A pesquisa não tem UTM,
+  então não há como atribuir qualificação por campanha no modelo atual.
+- **Coluna "Pesquisa"** (tabela de páginas): sempre zero, mesmo motivo — a pesquisa
+  não é rastreada por página.
+  → Ambas: remover as colunas ou preencher exige mudar a origem dos dados.
+- **Leads no Tráfego** só aparecem quando `utm_campaing` + `utm_content` do cadastro
+  batem com um anúncio real em `dim_anuncios` — mesmo critério já usado pelas vendas.
+- **SEAL não filtra por tag**: `core.vendas_pagarme` não tem coluna `tag`; a origem
+  fica em `last_origem`, que hoje não coincide com as tags cadastradas.
+
+---
+
+## 🟢 Polimento pendente
+
+- Skeletons de loading (hoje é um spinner único).
+- `public/favicon.svg` e `public/icons.svg` são órfãos — não referenciados em lugar
+  nenhum desde que o favicon virou PNG. Podem ser removidos.
+
+---
+
+## Ordem dos scripts SQL
+
+Todos já aplicados em produção. Rodar nesta ordem num banco novo:
+
+| # | Arquivo | O que faz |
+|---|---|---|
+| 01 | `01_views_mkt_wep.sql` | Views base do schema |
+| 02 | `02_rpc_mkt_wep.sql` | RPCs de agregação |
+| 07 | `07_lock_anon.sql` | Tranca o schema (só service_role lê) |
+| 08 | `08_rpc_pesquisa.sql` | Perfil das pesquisas |
+| 09 | `09_view_seal.sql` | SEAL (substituído em parte pelo 14) |
+| 10 | `10_table_wep_cadastro.sql` | Tabela de cadastros da captação |
+| 11 | `11_leads.sql` | Leads nos KPIs, tráfego e páginas |
+| 12 | `12_meta_investimento.sql` | Meta de investimento |
+| 13 | `13_serie_leads.sql` | Leads na série diária |
+| 14 | `14_seal_periodo.sql` | SEAL filtrado por período |
+
+> ⚠️ Ao adicionar coluna em `wep_tags`, **recriar a `vw_tags`** — ela foi criada com
+> `select *` e o Postgres congela as colunas de quando a view nasceu. Sem isso as
+> funções que leem metas falham com `column ... does not exist`.
+
+---
+
+## Desenvolvimento
+
+Para pular a tela de login ao ajustar o visual, em `.env.local`:
 
 ```
-order_id, status, data, hora, nome_completo, email, telefone,
-valor_produto, valor_cobrado, metodo_pagamento, produto, codigo_produto,
-parcelas, cidade, estado, customer_id, transaction_id,
-last_utm_source, last_utm_campaign, last_utm_medium, last_utm_content,
-last_utm_term, last_utm_pagina, last_funil, last_origem, vendido_por
+VITE_DEV_SKIP_AUTH=1
+DEV_SKIP_AUTH=1
 ```
 
-Exemplo de linha: `status='paid'`, `produto='SEAL - Complemento'`,
-`last_utm_campaign='ra-WEP-WEPMAR26-...'`, `last_origem='WEPMAR26'`.
-
-### Regra de negócio (o ponto central)
-Existem **três nomes de produto**:
-- `Seal® - Taxa de Reserva` → pagou **só a reserva**
-- `SEAL - Complemento` → pagou o **restante**
-- `Seal®` → pagou **tudo de uma vez**
-
-A view precisa dizer, **por aluno**, se ele:
-- pagou **somente a taxa de reserva**, ou
-- **quitou** (Taxa de Reserva + Complemento, **ou** `Seal®` numa tacada só)
-
-**O agrupamento é pelo campo `email`** (é a chave que identifica o aluno).
-
-### Pontos a definir antes de implementar
-- Filtrar por `status`? (no exemplo vem `paid` — confirmar quais contam)
-- O valor total do aluno é a soma de `valor_cobrado` das linhas dele?
-- Ligar com as tags do WEP via `last_origem` / `last_utm_campaign` (`ILIKE '%wep%'`)?
-- Onde isso aparece no painel: tabela nova? KPI? bloco próprio?
-
----
-
-## 3. Gráficos das respostas das pesquisas
-
-Fonte: `mkt_wep.wep_pesquisa` (tem a coluna `renda`, a coluna `qualificacao`
-e o campo `respostas` em JSON).
-
-| Gráfico | Dado |
-|---|---|
-| **Barras** | Renda |
-| **Rosca (donut)** | Idade |
-| **Barras** | Profissão |
-| **Pizza** | Gênero |
-
-### Pontos a definir
-- `idade`, `genero` e `profissao` estão dentro do JSON `respostas`
-  (o exemplo mostrava `{"idade":"35 a 44 anos","genero":"Masculino"}`) — confirmar
-  as chaves exatas e se `profissao` existe.
-- Provável necessidade de uma RPC nova que agrupe e conte por categoria
-  (não trazer linha a linha para o front).
-- Recharts já está no projeto (tem `PieChart`, e rosca = Pie com `innerRadius`).
-
----
-
-## Pendências técnicas herdadas
-
-- 🔴 **Rotacionar a `service_role`** do projeto de dados (exposta em conversa).
-  Formato JWT antigo derruba anon + service_role juntas → quebraria o Quartavia
-  e as automações. Ideal: criar uma **secret key dedicada** (`sb_secret_*`).
-  Ao trocar, atualizar em **dois lugares**: `.env.local` e as Environment
-  Variables do Vercel.
-- 🟢 Colunas sempre zeradas: "Qualificação" (tabela de tráfego) e "Pesquisa"
-  (tabela de páginas) — não há como preencher no modelo atual. Remover ou documentar.
-- 🟢 Polimento: skeletons de loading, favicon + título da aba.
+Só funciona em `npm run dev` — o cliente checa `import.meta.env.DEV` e a API checa
+`NODE_ENV !== 'production'`, então na Vercel é sempre ignorado. Voltar para `0`
+(e reiniciar o dev server) restaura o login normal.
