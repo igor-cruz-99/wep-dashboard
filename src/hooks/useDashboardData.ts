@@ -41,14 +41,6 @@ export interface DashboardData {
   sealCompradores: SealComprador[]
 }
 
-/** Blocos que reagem aos filtros (tag/período). */
-type FilteredData = Omit<DashboardData, 'seal' | 'sealCompradores'>
-/** Blocos independentes de filtro — o SEAL é sempre todas as vendas. */
-interface SealData {
-  seal: SealResumo
-  sealCompradores: SealComprador[]
-}
-
 interface State {
   data: DashboardData | null
   loading: boolean
@@ -58,44 +50,19 @@ interface State {
 /**
  * Carrega os blocos do painel via API /api/dashboard.
  *
- * Duas fontes com cadências diferentes:
- *  - dependentes de filtro (KPIs, funil, séries, tabelas, pesquisa): recarregam
- *    a cada mudança de tag/período;
- *  - SEAL (resumo + compradores): independem de filtro, então carregam UMA vez
- *    e são reaproveitados — evita refazer a query cara em core.vendas_pagarme
- *    a cada clique de filtro.
+ * TODOS os blocos respeitam o filtro de período — inclusive o SEAL, que filtra
+ * pela data da compra (core.vendas_pagarme.data). O SEAL não usa tag porque
+ * vendas_pagarme não tem essa coluna; só período.
  *
  * Sem dados fictícios: enquanto carrega, data = null (loading); em erro,
  * data = null e a mensagem fica em `error`.
  */
 export function useDashboardData(filters: Filters): State {
-  const [filtered, setFiltered] = useState<{
-    data: FilteredData | null
-    loading: boolean
-    error: string | null
-  }>({ data: null, loading: true, error: null })
-  const [seal, setSeal] = useState<SealData | null>(null)
+  const [state, setState] = useState<State>({ data: null, loading: true, error: null })
 
-  // SEAL: uma vez só (não depende de filtros).
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchSealResumo(), fetchSealCompradores()])
-      .then(([resumo, compradores]) => {
-        if (!cancelled) setSeal({ seal: resumo, sealCompradores: compradores })
-      })
-      .catch(() => {
-        // Os fetchers já são tolerantes (retornam vazio); este catch é só rede.
-        if (!cancelled) setSeal({ seal: { quitou: { alunos: 0, valorTotal: 0 }, reserva: { alunos: 0, valorTotal: 0 } }, sealCompradores: [] })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // Blocos dependentes de filtro: recarregam a cada mudança.
-  useEffect(() => {
-    let cancelled = false
-    setFiltered((s) => ({ ...s, loading: true, error: null }))
+    setState((s) => ({ ...s, loading: true, error: null }))
 
     Promise.all([
       fetchKpis(filters),
@@ -104,10 +71,12 @@ export function useDashboardData(filters: Filters): State {
       fetchTraffic(filters),
       fetchPages(filters),
       fetchPesquisaPerfil(filters),
+      fetchSealResumo(filters),
+      fetchSealCompradores(filters),
     ])
-      .then(([kpiRes, funnel, series, traffic, pages, perfil]) => {
+      .then(([kpiRes, funnel, series, traffic, pages, perfil, seal, sealCompradores]) => {
         if (cancelled) return
-        setFiltered({
+        setState({
           data: {
             kpis: kpiRes.cards,
             funnel,
@@ -116,6 +85,8 @@ export function useDashboardData(filters: Filters): State {
             pages,
             perfil,
             pesquisaResumo: { respostas: kpiRes.respostasPesquisa, leads: kpiRes.leads },
+            seal,
+            sealCompradores,
           },
           loading: false,
           error: null,
@@ -123,7 +94,7 @@ export function useDashboardData(filters: Filters): State {
       })
       .catch((err) => {
         if (cancelled) return
-        setFiltered({
+        setState({
           data: null,
           loading: false,
           error: (err as { message?: string })?.message ?? 'Erro ao carregar dados do Supabase.',
@@ -135,8 +106,5 @@ export function useDashboardData(filters: Filters): State {
     }
   }, [filters])
 
-  // Combina as duas fontes: só há `data` quando ambas chegaram.
-  const data =
-    filtered.data && seal ? { ...filtered.data, ...seal } : null
-  return { data, loading: filtered.loading, error: filtered.error }
+  return state
 }

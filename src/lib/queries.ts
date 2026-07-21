@@ -232,11 +232,16 @@ const SEAL_VAZIO: SealResumo = {
   reserva: { alunos: 0, valorTotal: 0 },
 }
 
-export async function fetchSealResumo(): Promise<SealResumo> {
+/** SEAL filtra pela DATA DA COMPRA (sem tag: vendas_pagarme não tem coluna tag). */
+const sealParams = (filters: Filters) => ({
+  p_from: filters.from || null,
+  p_to: filters.to || null,
+})
+
+export async function fetchSealResumo(filters: Filters): Promise<SealResumo> {
   let rows: SealRow[]
   try {
-    // Sem filtros: os cards mostram sempre o total do produto SEAL.
-    rows = (await callApi<SealRow[]>('fn_seal_resumo')) ?? []
+    rows = (await callApi<SealRow[]>('fn_seal_resumo', sealParams(filters))) ?? []
   } catch (err) {
     // Bloco opcional: se a RPC/view ainda não foi aplicada, não derruba o painel.
     console.warn('fn_seal_resumo indisponível:', (err as Error)?.message)
@@ -249,10 +254,10 @@ export async function fetchSealResumo(): Promise<SealResumo> {
   return { quitou: find('quitou'), reserva: find('reserva') }
 }
 
-export async function fetchSealCompradores(): Promise<SealComprador[]> {
+export async function fetchSealCompradores(filters: Filters): Promise<SealComprador[]> {
   let rows: SealCompradorRow[]
   try {
-    rows = (await callApi<SealCompradorRow[]>('fn_seal_compradores')) ?? []
+    rows = (await callApi<SealCompradorRow[]>('fn_seal_compradores', sealParams(filters))) ?? []
   } catch (err) {
     console.warn('fn_seal_compradores indisponível:', (err as Error)?.message)
     return []
