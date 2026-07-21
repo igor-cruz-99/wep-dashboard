@@ -22,6 +22,7 @@ const columns: Column[] = [
   { label: 'Page View', get: (r) => r.pageView, fmt: (r) => formatInt(r.pageView), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
   { label: 'Checkout', get: (r) => r.checkout, fmt: (r) => formatInt(r.checkout), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
   { label: 'Vendas', get: (r) => r.vendas, fmt: (r) => formatInt(r.vendas), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+  { label: 'Leads', get: (r) => r.leads, fmt: (r) => formatInt(r.leads), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
   { label: 'Pesquisa', get: (r) => r.pesquisa, fmt: (r) => formatInt(r.pesquisa), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
   { label: 'Checkout x Venda', get: (r) => ratio(r.vendas, r.checkout), fmt: (r) => formatPct(ratio(r.vendas, r.checkout)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
   { label: 'Visita x Checkout', get: (r) => ratio(r.checkout, r.pageView), fmt: (r) => formatPct(ratio(r.checkout, r.pageView)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },

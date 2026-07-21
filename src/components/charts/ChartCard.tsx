@@ -4,7 +4,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   LabelList,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +16,16 @@ import type { DailyPoint } from '../../types'
 import { formatBRL, formatInt } from '../../utils/format'
 import { Panel } from '../ui/Panel'
 
+type ValueFormat = 'int' | 'brl' | 'pct'
+
+/** Série de linha secundária, sobreposta às barras (eixo Y à direita). */
+interface LineSeries {
+  data: DailyPoint[]
+  color: string
+  label: string
+  format?: ValueFormat
+}
+
 interface ChartCardProps {
   title: string
   data: DailyPoint[]
@@ -21,8 +33,12 @@ interface ChartCardProps {
   kind: 'bar' | 'area'
   /** Cor da série (linha/barras). */
   color: string
+  /** Rótulo da série primária (usado na legenda/tooltip quando há combo). */
+  seriesLabel?: string
   /** Como formatar a média do cabeçalho. */
   headlineFormat?: 'int' | 'brl'
+  /** Linha secundária → vira gráfico combo (barras + linha, eixo duplo). */
+  line?: LineSeries
   /** Clique numa coluna/ponto → filtra o painel por aquele dia (YYYY-MM-DD). */
   onSelectDay?: (date: string) => void
 }
@@ -40,19 +56,28 @@ function spanDays(data: { date: string }[]) {
   return Math.abs(b - a) / 86_400_000
 }
 
+const fmtBy = (f: ValueFormat | undefined, v: number) =>
+  f === 'brl' ? formatBRL(v) : f === 'pct' ? `${Math.round(v)}%` : formatInt(v)
+
 /** Rótulo do valor em cada marcador/barra (inteiro, fonte pequena). */
 const valueLabel = (v: unknown) => Math.round(Number(v)).toString()
 
 const axisTick = { fontSize: 10, fill: '#8d7c68' }
 const axisLine = { stroke: '#3a2d21' }
 
-/** Card de gráfico diário: título, média/dia e gráfico (barras ou linha). */
+/**
+ * Card de gráfico diário. Simples (barras ou área) ou COMBO: quando recebe
+ * `line`, vira barras (série primária, eixo esquerdo) + linha (secundária,
+ * eixo direito), com bolinhas coloridas ao lado do título identificando cada série.
+ */
 export function ChartCard({
   title,
   data,
   kind,
   color,
+  seriesLabel = 'Valor',
   headlineFormat = 'int',
+  line,
   onSelectDay,
 }: ChartCardProps) {
   const avg = data.length
@@ -75,8 +100,20 @@ export function ChartCard({
       }
     : undefined
 
+  // Combo: junta as duas séries por data (mesmo eixo temporal da fn_serie_diaria).
+  const comboData = line
+    ? (() => {
+        const map = new Map(data.map((p) => [p.date, { date: p.date, value: p.value, line: 0 }]))
+        for (const p of line.data) {
+          const e = map.get(p.date) ?? { date: p.date, value: 0, line: 0 }
+          e.line = p.value
+          map.set(p.date, e)
+        }
+        return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
+      })()
+    : []
+
   const shared = {
-    data,
     margin: { top: 14, right: 2, bottom: 2, left: 2 },
     onClick: handleClick,
     style: onSelectDay ? { cursor: 'pointer' as const } : undefined,
@@ -93,38 +130,37 @@ export function ChartCard({
       minTickGap={40}
     />
   )
-  const yAxis = (
-    <YAxis tick={axisTick} tickLine={false} axisLine={axisLine} width={34} />
-  )
-  const tooltip = (
-    <Tooltip
-      contentStyle={{
-        borderRadius: 10,
-        border: '1px solid #3a2d21',
-        background: '#211a13',
-        color: '#f2e9d8',
-        fontSize: 12,
-      }}
-      labelFormatter={(d) => dmy(d as string)}
-      formatter={(v) => [v as number, 'Valor']}
-      cursor={{ fill: '#f2e9d811' }}
-    />
-  )
-  const labels = (
-    <LabelList
-      dataKey="value"
-      position="top"
-      offset={8}
-      fontSize={9}
-      fill={color}
-      formatter={valueLabel}
-    />
-  )
+  const tooltipBase = {
+    contentStyle: {
+      borderRadius: 10,
+      border: '1px solid #3a2d21',
+      background: '#211a13',
+      color: '#f2e9d8',
+      fontSize: 12,
+    },
+    labelFormatter: (d: unknown) => dmy(d as string),
+    cursor: { fill: '#f2e9d811' },
+  }
+
+  // Combo: cada segmento do título ("A | B") ganha uma bolinha à esquerda, na
+  // cor da sua série — A = barras (color), B = linha (line.color).
+  const segColors = [color, line?.color ?? color]
 
   return (
     <Panel className="p-4">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">
-        {title}
+      <h3 className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">
+        {line
+          ? title.split(' | ').map((seg, i) => (
+              <span key={i} className="flex items-center gap-1.5">
+                {i > 0 && <span className="opacity-40">|</span>}
+                <span
+                  className="inline-block h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: segColors[i] ?? color }}
+                />
+                {seg}
+              </span>
+            ))
+          : title}
       </h3>
       <p className="mb-2 mt-1">
         <span className="text-2xl font-bold text-cream">{headline}</span>
@@ -132,12 +168,54 @@ export function ChartCard({
       </p>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
-          {kind === 'bar' ? (
-            <BarChart {...shared}>
+          {line ? (
+            <ComposedChart data={comboData} {...shared}>
               {grid}
               {xAxis}
-              {yAxis}
-              {tooltip}
+              <YAxis yAxisId="left" tick={axisTick} tickLine={false} axisLine={axisLine} width={30} />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={axisTick}
+                tickLine={false}
+                axisLine={axisLine}
+                width={34}
+              />
+              <Tooltip
+                {...tooltipBase}
+                formatter={(v, name) =>
+                  name === line.label
+                    ? [fmtBy(line.format, Number(v)), line.label]
+                    : [fmtBy(headlineFormat, Number(v)), seriesLabel]
+                }
+              />
+              <Bar
+                yAxisId="left"
+                name={seriesLabel}
+                dataKey="value"
+                fill={color}
+                fillOpacity={0.85}
+                radius={[3, 3, 0, 0]}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="right"
+                name={line.label}
+                type="monotone"
+                dataKey="line"
+                stroke={line.color}
+                strokeWidth={2.5}
+                dot={{ r: 2, fill: line.color, strokeWidth: 0 }}
+                activeDot={{ r: 4 }}
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          ) : kind === 'bar' ? (
+            <BarChart data={data} {...shared}>
+              {grid}
+              {xAxis}
+              <YAxis tick={axisTick} tickLine={false} axisLine={axisLine} width={34} />
+              <Tooltip {...tooltipBase} formatter={(v) => [v as number, seriesLabel]} />
               <Bar
                 dataKey="value"
                 fill={color}
@@ -145,11 +223,11 @@ export function ChartCard({
                 radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
               >
-                {labels}
+                <LabelList dataKey="value" position="top" offset={8} fontSize={9} fill={color} formatter={valueLabel} />
               </Bar>
             </BarChart>
           ) : (
-            <AreaChart {...shared}>
+            <AreaChart data={data} {...shared}>
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={color} stopOpacity={0.32} />
@@ -158,8 +236,8 @@ export function ChartCard({
               </defs>
               {grid}
               {xAxis}
-              {yAxis}
-              {tooltip}
+              <YAxis tick={axisTick} tickLine={false} axisLine={axisLine} width={34} />
+              <Tooltip {...tooltipBase} formatter={(v) => [v as number, seriesLabel]} />
               <Area
                 type="monotone"
                 dataKey="value"
@@ -170,7 +248,7 @@ export function ChartCard({
                 activeDot={{ r: 4.5 }}
                 isAnimationActive={false}
               >
-                {labels}
+                <LabelList dataKey="value" position="top" offset={8} fontSize={9} fill={color} formatter={valueLabel} />
               </Area>
             </AreaChart>
           )}

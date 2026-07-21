@@ -36,6 +36,7 @@ export interface TrafficRow {
   anuncio: string | null
   investimento: number
   vendas: number
+  leads: number
   cac: number
   qualificacao: number
   hook: number // % retenção inicial
@@ -50,6 +51,7 @@ export interface PageRow {
   pageView: number
   checkout: number
   vendas: number
+  leads: number
   pesquisa: number
 }
 

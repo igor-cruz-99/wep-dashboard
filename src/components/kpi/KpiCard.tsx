@@ -10,7 +10,7 @@ function formatValue(value: number, format: Kpi['format']) {
 }
 
 /** Setinha de tendência: sobe quando a métrica vai bem, desce quando vai mal. */
-function TrendArrow({ up, color }: { up: boolean; color: string }) {
+export function TrendArrow({ up, color }: { up: boolean; color: string }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path

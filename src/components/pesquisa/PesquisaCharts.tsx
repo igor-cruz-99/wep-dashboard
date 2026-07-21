@@ -2,6 +2,7 @@ import {
   Bar,
   BarChart,
   Cell,
+  LabelList,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -10,7 +11,9 @@ import {
   YAxis,
 } from 'recharts'
 import type { PerfilDatum, PesquisaPerfil } from '../../types'
-import { formatInt } from '../../utils/format'
+import { formatInt, formatPct } from '../../utils/format'
+import { metaColor, metaScore } from '../../utils/metaColor'
+import { TrendArrow } from '../kpi/KpiCard'
 import { Panel, SectionTitle } from '../ui/Panel'
 
 /**
@@ -73,7 +76,8 @@ function HBar({ data }: { data: PerfilDatum[] }) {
   const total = data.reduce((s, d) => s + d.total, 0)
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+      {/* right maior: abre espaço para o rótulo "valor (%)" na ponta da barra. */}
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, bottom: 4, left: 8 }}>
         <XAxis type="number" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: '#3a2d21' }} allowDecimals={false} />
         <YAxis
           type="category"
@@ -84,7 +88,20 @@ function HBar({ data }: { data: PerfilDatum[] }) {
           width={130}
         />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f2e9d811' }} formatter={makeTooltipFormatter(total)} />
-        <Bar dataKey="total" fill={BAR_COLOR} radius={[0, 3, 3, 0]} isAnimationActive={false} />
+        <Bar dataKey="total" fill={BAR_COLOR} radius={[0, 3, 3, 0]} isAnimationActive={false}>
+          <LabelList
+            dataKey="total"
+            position="right"
+            offset={6}
+            fontSize={10}
+            fill="#f2e9d8"
+            formatter={(v: unknown) => {
+              const n = Number(v)
+              const pct = total > 0 ? Math.round((n / total) * 100) : 0
+              return `${formatInt(n)} (${pct}%)`
+            }}
+          />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   )
@@ -167,14 +184,37 @@ function Donut({ data, inner = 0 }: { data: PerfilDatum[]; inner?: number | stri
   )
 }
 
+interface PesquisaChartsProps {
+  perfil: PesquisaPerfil
+  /** Nº de respostas de pesquisa e de leads (para o resumo ao lado do título). */
+  respostas: number
+  leads: number
+}
+
 /**
  * Bloco "Respostas dos compradores" (roadmap item 3): 4 gráficos em grid 2×2.
  * Renda e profissão em barras; idade em rosca; gênero em pizza.
+ * Ao lado do título: nº de respostas e % sobre os leads (pesquisa ÷ leads).
  */
-export function PesquisaCharts({ perfil }: { perfil: PesquisaPerfil }) {
+export function PesquisaCharts({ perfil, respostas, leads }: PesquisaChartsProps) {
+  // % de quem virou lead e respondeu a pesquisa. Cor na escala 0–100 (igual aos KPIs).
+  const pct = leads > 0 ? (respostas / leads) * 100 : 0
+  const cor = metaColor(pct, 'normal')
+  const bom = metaScore(pct, 'normal') >= 0.5
+
   return (
     <Panel className="p-5">
-      <SectionTitle overline="Pesquisa" title="Respostas dos compradores" className="mb-4" />
+      {/* Resumo colado à direita do subtítulo (não na ponta do painel). */}
+      <div className="mb-4 flex flex-wrap items-end gap-x-3 gap-y-1">
+        <SectionTitle overline="Pesquisa" title="Respostas dos compradores" />
+        <div className="flex items-baseline gap-2">
+          <span className="text-xl font-bold text-cream">{formatInt(respostas)}</span>
+          <span className="inline-flex items-center gap-1 text-sm font-bold" style={{ color: cor }}>
+            ({formatPct(pct)}
+            <TrendArrow up={bom} color={cor} />)
+          </span>
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <ChartFrame title="Renda">
           <HBar data={perfil.renda} />

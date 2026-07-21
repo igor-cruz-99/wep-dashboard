@@ -14,10 +14,13 @@ import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
 import type { Filters } from '../types'
 
-// Cores das séries — marrom claro / caramelo
+// Cores das séries. Barras em caramelo; linhas dos combos em cores distintas
+// para dar contraste (e casar com as bolinhas ao lado do título).
 const SERIES = {
-  vendas: '#c9945f',
-  cac: '#c9945f',
+  vendas: '#c9945f', // barras
+  cac: '#f5efe0', // linha (creme) do combo Vendas|CAC
+  leads: '#c9945f', // barras
+  conversaoLeads: '#8fbf7f', // linha (verde) do combo Leads|Conversão
   investimento: '#c9945f',
   conversao: '#c9945f',
 }
@@ -182,7 +185,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
       ) : (
         <>
           {/* KPIs */}
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
             {data.kpis.map((k) => (
               <KpiCard key={k.id} kpi={k} />
             ))}
@@ -192,18 +195,21 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr_1fr]">
             <div className="flex flex-col gap-4">
               <ChartCard
-                title="Vendas por dia"
+                title="Vendas por dia | CAC"
                 data={data.series.vendasPorDia}
                 kind="bar"
                 color={SERIES.vendas}
+                seriesLabel="Vendas"
+                line={{ data: data.series.cacPorDia, color: SERIES.cac, label: 'CAC', format: 'brl' }}
                 onSelectDay={selectDay}
               />
               <ChartCard
-                title="CAC por dia"
-                data={data.series.cacPorDia}
-                kind="area"
-                color={SERIES.cac}
-                headlineFormat="brl"
+                title="Leads por dia | Conversão"
+                data={data.series.leadsPorDia}
+                kind="bar"
+                color={SERIES.leads}
+                seriesLabel="Leads"
+                line={{ data: data.series.conversaoLeadsPorDia, color: SERIES.conversaoLeads, label: 'Conversão', format: 'pct' }}
                 onSelectDay={selectDay}
               />
             </div>
@@ -226,7 +232,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                 onSelectDay={selectDay}
               />
               <ChartCard
-                title="Conversão por dia"
+                title="Conversão Checkout por dia"
                 data={data.series.conversaoPorDia}
                 kind="area"
                 color={SERIES.conversao}
@@ -239,7 +245,11 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           <div className="mt-6 flex flex-col gap-6">
             <TrafficTable rows={data.traffic} />
             <PagesTable rows={data.pages} />
-            <PesquisaCharts perfil={data.perfil} />
+            <PesquisaCharts
+              perfil={data.perfil}
+              respostas={data.pesquisaResumo.respostas}
+              leads={data.pesquisaResumo.leads}
+            />
 
             {/* SEAL — situação de pagamento + compradores */}
             <div className="flex flex-col gap-4">

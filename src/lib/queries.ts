@@ -59,14 +59,17 @@ interface KpiRow {
   entradas_grupo: number
   pesquisas: number
   qualificados: number
+  leads: number
   meta_vendas: number
   meta_faturamento: number
   meta_cac: number
   meta_grupo: number
   meta_qualificacao: number
+  meta_leads: number
+  meta_investimento: number
 }
 interface FunilRow { etapa: string; valor: number; ordem: number }
-interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number }
+interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number }
 interface TrafegoRow {
   nivel: TrafficRow['nivel']
   campanha: string | null
@@ -74,12 +77,13 @@ interface TrafegoRow {
   anuncio: string | null
   investimento: number
   vendas: number
+  leads: number
   cac: number
   hook: number
   hold: number
   body: number
 }
-interface PaginaRow { pagina: string; page_views: number; checkouts: number; vendas: number }
+interface PaginaRow { pagina: string; page_views: number; checkouts: number; vendas: number; leads: number }
 interface PerfilRow { dimensao: string; categoria: string; total: number }
 interface SealRow { situacao: string; alunos: number; valor_total: number }
 interface SealCompradorRow {
@@ -93,7 +97,14 @@ interface SealCompradorRow {
 }
 
 // ── KPIs ──────────────────────────────────────────────────────────────────
-export async function fetchKpis(filters: Filters): Promise<Kpi[]> {
+export interface KpisResult {
+  cards: Kpi[]
+  /** Nº de respostas de pesquisa e de leads no filtro (para o resumo do bloco Pesquisa). */
+  respostasPesquisa: number
+  leads: number
+}
+
+export async function fetchKpis(filters: Filters): Promise<KpisResult> {
   const data = await callApi<KpiRow[]>('fn_kpis', rpcParams(filters))
   const r = (data?.[0] ?? {}) as Partial<KpiRow>
   const num = (v: number | undefined) => Number(v ?? 0)
@@ -101,13 +112,15 @@ export async function fetchKpis(filters: Filters): Promise<Kpi[]> {
   const grupoPct = num(r.entradas_grupo) > 0 ? (num(r.vendas_count) / num(r.entradas_grupo)) * 100 : 0
   const qualifPct = num(r.pesquisas) > 0 ? (num(r.qualificados) / num(r.pesquisas)) * 100 : 0
 
-  return [
+  const cards: Kpi[] = [
+    { id: 'investimento', label: 'Investimento', value: num(r.investimento), meta: num(r.meta_investimento), format: 'brl', direction: 'inverse' },
+    { id: 'leads', label: 'Leads', value: num(r.leads), meta: num(r.meta_leads), format: 'int', direction: 'normal' },
     { id: 'vendas', label: 'Vendas Ingressos', value: num(r.vendas_count), meta: num(r.meta_vendas), format: 'int', direction: 'normal' },
-    { id: 'faturamento', label: 'Faturamento', value: num(r.faturamento), meta: num(r.meta_faturamento), format: 'brl', direction: 'normal' },
     { id: 'cac', label: 'CAC', value: num(r.cac), meta: num(r.meta_cac), format: 'brl', direction: 'inverse' },
     { id: 'grupo', label: 'Entrada Grupo', value: grupoPct, meta: num(r.meta_grupo), format: 'pct', direction: 'normal' },
     { id: 'qualificacao', label: 'Qualificação', value: qualifPct, meta: num(r.meta_qualificacao), format: 'pct', direction: 'normal' },
   ]
+  return { cards, respostasPesquisa: num(r.pesquisas), leads: num(r.leads) }
 }
 
 // ── Funil ───────────────────────────────────────────────────────────────────
@@ -120,19 +133,29 @@ export async function fetchFunnel(filters: Filters): Promise<FunnelStage[]> {
   }))
 }
 
-// ── Séries diárias (4 gráficos) ─────────────────────────────────────────────
+// ── Séries diárias (gráficos) ───────────────────────────────────────────────
 export async function fetchSeries(filters: Filters): Promise<{
   vendasPorDia: DailyPoint[]
   cacPorDia: DailyPoint[]
+  leadsPorDia: DailyPoint[]
+  conversaoLeadsPorDia: DailyPoint[]
   investimentoPorDia: DailyPoint[]
   conversaoPorDia: DailyPoint[]
 }> {
   const rows = (await callApi<SerieRow[]>('fn_serie_diaria', rpcParams(filters))) ?? []
   const pick = (key: keyof SerieRow): DailyPoint[] =>
-    rows.map((r) => ({ date: r.data, value: Number(r[key]) }))
+    rows.map((r) => ({ date: r.data, value: Number(r[key] ?? 0) }))
   return {
     vendasPorDia: pick('vendas'),
     cacPorDia: pick('cac'),
+    leadsPorDia: pick('leads'),
+    // Conversão do dia = vendas de ingresso ÷ leads (%). Calculado no front a
+    // partir das duas séries do mesmo dia.
+    conversaoLeadsPorDia: rows.map((r) => {
+      const leads = Number(r.leads ?? 0)
+      const vendas = Number(r.vendas ?? 0)
+      return { date: r.data, value: leads > 0 ? (vendas / leads) * 100 : 0 }
+    }),
     investimentoPorDia: pick('investimento'),
     conversaoPorDia: pick('conversao'),
   }
@@ -153,6 +176,7 @@ export async function fetchTraffic(filters: Filters): Promise<TrafficRow[]> {
     anuncio: r.anuncio,
     investimento: Number(r.investimento),
     vendas: Number(r.vendas),
+    leads: Number(r.leads ?? 0), // tolera fn_trafego antiga (sem leads) até rodar o 11_leads.sql
     cac: Number(r.cac),
     qualificacao: 0, // N/A por campanha (pesquisa não tem UTM) — ver pendência
     hook: Number(r.hook),
@@ -173,6 +197,7 @@ export async function fetchPages(filters: Filters): Promise<PageRow[]> {
     pageView: Number(r.page_views),
     checkout: Number(r.checkouts),
     vendas: Number(r.vendas),
+    leads: Number(r.leads ?? 0), // tolera fn_paginas antiga (sem leads) até rodar o 11_leads.sql
     pesquisa: 0, // pesquisa não é por página no modelo atual — ver pendência
   }))
 }
