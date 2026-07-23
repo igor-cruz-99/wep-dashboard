@@ -32,7 +32,9 @@ export function TrendArrow({ up, color }: { up: boolean; color: string }) {
  *  - barra de progresso (verde-claro→verde-escuro quando positivo)
  */
 export function KpiCard({ kpi }: { kpi: Kpi }) {
-  const pct = kpi.meta === 0 ? 0 : (kpi.value / kpi.meta) * 100
+  // Sem meta (ex.: CPL): card mostra só o valor, sem %meta/seta/barra.
+  const hasMeta = typeof kpi.meta === 'number' && kpi.meta > 0
+  const pct = hasMeta ? (kpi.value / (kpi.meta as number)) * 100 : 0
   const score = metaScore(pct, kpi.direction)
   const color = metaColor(pct, kpi.direction)
   const good = score >= 0.5
@@ -44,38 +46,39 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
   return (
     <Panel
       className="relative overflow-hidden px-4 pb-4 pt-3"
-      style={{
-        backgroundImage: `radial-gradient(120% 90% at 100% 0%, ${color}2e 0%, transparent 55%)`,
-      }}
+      style={
+        hasMeta
+          ? { backgroundImage: `radial-gradient(120% 90% at 100% 0%, ${color}2e 0%, transparent 55%)` }
+          : undefined
+      }
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">
           {kpi.label}
         </span>
-        <span
-          className="flex items-center gap-1 text-xs font-bold"
-          style={{ color }}
-        >
-          <TrendArrow up={good} color={color} />
-          {formatPct(pct)}
-        </span>
+        {hasMeta && (
+          <span className="flex items-center gap-1 text-xs font-bold" style={{ color }}>
+            <TrendArrow up={good} color={color} />
+            {formatPct(pct)}
+          </span>
+        )}
       </div>
 
       <p className="mt-2 text-3xl font-bold tracking-tight text-cream">
         {formatValue(kpi.value, kpi.format)}
       </p>
-      <p className="mt-1 text-xs text-muted">Meta {formatValue(kpi.meta, kpi.format)}</p>
 
-      {/* Barra de progresso */}
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-card-2">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${Math.min(100, Math.max(2, pct))}%`,
-            background: barGradient,
-          }}
-        />
-      </div>
+      {hasMeta && (
+        <>
+          <p className="mt-1 text-xs text-muted">Meta {formatValue(kpi.meta as number, kpi.format)}</p>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-card-2">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${Math.min(100, Math.max(2, pct))}%`, background: barGradient }}
+            />
+          </div>
+        </>
+      )}
     </Panel>
   )
 }

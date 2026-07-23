@@ -114,10 +114,13 @@ function buildMetrics(stages: FunnelStage[], cac?: number): OverlayMetric[] {
   const impressoes = at('Impressões')
   const cliques = at('Cliques')
   const pageViews = at('Page Views')
-  const vendas = at('Vendas')
+  const leads = at('Leads')
 
   const pctOf = (v: number | null) => (v === null ? null : v * 100)
 
+  // Boundaries seguem os índices das etapas (Leads entrou entre Page Views e
+  // Checkouts): 0 Invest · 1 Alcance · 2 Impr · 3 Cliques · 4 PageViews · 5 Leads
+  // · 6 Checkouts · 7 Vendas. Cada caixa ancora na borda inferior do índice.
   return [
     // Alcance → Impressões
     { label: 'Frequência', boundary: 1, side: 'right', text: fmt(safe(impressoes, alcance), formatDec1) },
@@ -127,10 +130,12 @@ function buildMetrics(stages: FunnelStage[], cac?: number): OverlayMetric[] {
     // Cliques → Page Views
     { label: 'CPC', boundary: 3, side: 'left', text: fmt(safe(investimento, cliques), formatBRL) },
     { label: 'Connect Rate', boundary: 3, side: 'right', text: fmt(pctOf(safe(pageViews, cliques)), formatPct2) },
-    // Page Views → Checkouts
+    // Page Views → Leads
     { label: 'CPLV', boundary: 4, side: 'left', text: fmt(safe(investimento, pageViews), formatBRL) },
-    { label: 'Conversão Página', boundary: 4, side: 'right', text: fmt(pctOf(safe(vendas, pageViews)), formatPct2) },
+    { label: 'Conversão Página', boundary: 4, side: 'right', text: fmt(pctOf(safe(leads, pageViews)), formatPct2) },
+    // Leads → Checkouts
+    { label: 'CPL', boundary: 5, side: 'left', text: fmt(safe(investimento, leads), formatBRL) },
     // Checkouts → Vendas
-    { label: 'CAC', boundary: 5, side: 'left', text: cac && cac > 0 ? formatBRL(cac) : null },
+    { label: 'CAC', boundary: 6, side: 'left', text: cac && cac > 0 ? formatBRL(cac) : null },
   ]
 }

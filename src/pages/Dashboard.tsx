@@ -185,7 +185,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
       ) : (
         <>
           {/* KPIs */}
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
             {data.kpis.map((k) => (
               <KpiCard key={k.id} kpi={k} />
             ))}

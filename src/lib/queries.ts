@@ -109,12 +109,16 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
   const r = (data?.[0] ?? {}) as Partial<KpiRow>
   const num = (v: number | undefined) => Number(v ?? 0)
 
-  const grupoPct = num(r.entradas_grupo) > 0 ? (num(r.vendas_count) / num(r.entradas_grupo)) * 100 : 0
+  // Entrada Grupo = % dos leads que entraram no grupo (entradas ÷ leads).
+  const grupoPct = num(r.leads) > 0 ? (num(r.entradas_grupo) / num(r.leads)) * 100 : 0
   const qualifPct = num(r.pesquisas) > 0 ? (num(r.qualificados) / num(r.pesquisas)) * 100 : 0
+  const cpl = num(r.leads) > 0 ? num(r.investimento) / num(r.leads) : 0
 
   const cards: Kpi[] = [
     { id: 'investimento', label: 'Investimento', value: num(r.investimento), meta: num(r.meta_investimento), format: 'brl', direction: 'inverse' },
     { id: 'leads', label: 'Leads', value: num(r.leads), meta: num(r.meta_leads), format: 'int', direction: 'normal' },
+    // CPL sem meta por enquanto (não há meta_cpl em wep_tags) — card só com o valor.
+    { id: 'cpl', label: 'CPL', value: cpl, format: 'brl', direction: 'inverse' },
     { id: 'vendas', label: 'Vendas Ingressos', value: num(r.vendas_count), meta: num(r.meta_vendas), format: 'int', direction: 'normal' },
     { id: 'cac', label: 'CAC', value: num(r.cac), meta: num(r.meta_cac), format: 'brl', direction: 'inverse' },
     { id: 'grupo', label: 'Entrada Grupo', value: grupoPct, meta: num(r.meta_grupo), format: 'pct', direction: 'normal' },

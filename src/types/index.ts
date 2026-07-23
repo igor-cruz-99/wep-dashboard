@@ -5,7 +5,8 @@ export interface Kpi {
   id: string
   label: string
   value: number
-  meta: number
+  /** Meta do KPI. Ausente = card só com o valor (sem %meta, seta ou barra). */
+  meta?: number
   /** Como exibir o valor. */
   format: 'int' | 'brl' | 'pct'
   /** Direção da cor da %meta. CAC é 'inverse'. */

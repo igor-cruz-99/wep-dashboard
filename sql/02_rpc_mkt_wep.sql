@@ -124,6 +124,12 @@ as $$
     from mkt_wep.vw_paginas_diario
     where (p_from is null or data >= p_from) and (p_to is null or data <= p_to)
   ),
+  ld as (
+    select count(*) as leads
+    from mkt_wep.wep_cadastro
+    where (p_tag is null or tag = p_tag)
+      and (p_from is null or data >= p_from) and (p_to is null or data <= p_to)
+  ),
   ck as (
     select count(*) as checkouts
     from mkt_wep.vw_checkouts
@@ -141,8 +147,9 @@ as $$
   union all select 'Impressões',  a.impressoes,  3 from a
   union all select 'Cliques',     a.cliques,     4 from a
   union all select 'Page Views',  pv.page_views, 5 from pv
-  union all select 'Checkouts',   ck.checkouts,  6 from ck
-  union all select 'Vendas',      vd.vendas,     7 from vd
+  union all select 'Leads',       ld.leads,      6 from ld
+  union all select 'Checkouts',   ck.checkouts,  7 from ck
+  union all select 'Vendas',      vd.vendas,     8 from vd
   order by 3;
 $$;
 

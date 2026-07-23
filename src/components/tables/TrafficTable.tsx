@@ -23,6 +23,8 @@ function buildColumns(firstCol: string): Column[] {
     { label: 'Investimento', get: (r) => r.investimento, fmt: (r) => formatBRL(r.investimento), num: true, agg: 'sum', fmtAgg: formatBRL, heat: 'heat' },
     { label: 'Vendas', get: (r) => r.vendas, fmt: (r) => formatInt(r.vendas), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
     { label: 'Leads', get: (r) => r.leads, fmt: (r) => formatInt(r.leads), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+    // CPL = Investimento ÷ Leads (custo por lead), por linha.
+    { label: 'CPL', get: (r) => (r.leads > 0 ? r.investimento / r.leads : 0), fmt: (r) => formatBRL(r.leads > 0 ? r.investimento / r.leads : 0), num: true, agg: 'avg', fmtAgg: formatBRL, heat: 'heat' },
     { label: 'CAC', get: (r) => r.cac, fmt: (r) => formatBRL(r.cac), num: true, agg: 'avg', fmtAgg: formatBRL, heat: 'heat' },
     { label: 'Qualificação', get: (r) => r.qualificacao, fmt: (r) => formatPct(r.qualificacao), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
     { label: 'Hook', get: (r) => r.hook, fmt: (r) => formatPct(r.hook), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
