@@ -67,6 +67,7 @@ interface KpiRow {
   meta_qualificacao: number
   meta_leads: number
   meta_investimento: number
+  meta_cpl: number
 }
 interface FunilRow { etapa: string; valor: number; ordem: number }
 interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number }
@@ -117,8 +118,7 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
   const cards: Kpi[] = [
     { id: 'investimento', label: 'Investimento', value: num(r.investimento), meta: num(r.meta_investimento), format: 'brl', direction: 'inverse' },
     { id: 'leads', label: 'Leads', value: num(r.leads), meta: num(r.meta_leads), format: 'int', direction: 'normal' },
-    // CPL sem meta por enquanto (não há meta_cpl em wep_tags) — card só com o valor.
-    { id: 'cpl', label: 'CPL', value: cpl, format: 'brl', direction: 'inverse' },
+    { id: 'cpl', label: 'CPL', value: cpl, meta: num(r.meta_cpl), format: 'brl', direction: 'inverse' },
     { id: 'vendas', label: 'Vendas Ingressos', value: num(r.vendas_count), meta: num(r.meta_vendas), format: 'int', direction: 'normal' },
     { id: 'cac', label: 'CAC', value: num(r.cac), meta: num(r.meta_cac), format: 'brl', direction: 'inverse' },
     { id: 'grupo', label: 'Entrada Grupo', value: grupoPct, meta: num(r.meta_grupo), format: 'pct', direction: 'normal' },

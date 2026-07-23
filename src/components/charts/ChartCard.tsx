@@ -147,7 +147,7 @@ export function ChartCard({
   const segColors = [color, line?.color ?? color]
 
   return (
-    <Panel className="p-4">
+    <Panel className="flex h-full flex-1 flex-col p-4">
       <h3 className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">
         {line
           ? title.split(' | ').map((seg, i) => (
@@ -166,7 +166,8 @@ export function ChartCard({
         <span className="text-2xl font-bold text-cream">{headline}</span>
         <span className="ml-1.5 text-xs text-muted">média/dia</span>
       </p>
-      <div className="h-56">
+      {/* flex-1: o gráfico cresce para preencher a altura da coluna (alinha com o funil). */}
+      <div className="min-h-[224px] flex-1">
         <ResponsiveContainer width="100%" height="100%">
           {line ? (
             <ComposedChart data={comboData} {...shared}>
