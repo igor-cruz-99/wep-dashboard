@@ -70,7 +70,7 @@ interface KpiRow {
   meta_cpl: number
 }
 interface FunilRow { etapa: string; valor: number; ordem: number }
-interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number }
+interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number; page_views: number }
 interface TrafegoRow {
   nivel: TrafficRow['nivel']
   campanha: string | null
@@ -153,12 +153,12 @@ export async function fetchSeries(filters: Filters): Promise<{
     vendasPorDia: pick('vendas'),
     cacPorDia: pick('cac'),
     leadsPorDia: pick('leads'),
-    // Conversão do dia = vendas de ingresso ÷ leads (%). Calculado no front a
-    // partir das duas séries do mesmo dia.
+    // Conversão do dia = Leads ÷ Page Views (%), igual à "Conversão Página" do
+    // funil (conversão da captação). Calculada no front com as duas séries do dia.
     conversaoLeadsPorDia: rows.map((r) => {
       const leads = Number(r.leads ?? 0)
-      const vendas = Number(r.vendas ?? 0)
-      return { date: r.data, value: leads > 0 ? (vendas / leads) * 100 : 0 }
+      const pageViews = Number(r.page_views ?? 0)
+      return { date: r.data, value: pageViews > 0 ? (leads / pageViews) * 100 : 0 }
     }),
     investimentoPorDia: pick('investimento'),
     conversaoPorDia: pick('conversao'),
