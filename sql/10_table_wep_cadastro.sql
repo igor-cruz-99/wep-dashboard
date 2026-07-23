@@ -5,8 +5,8 @@
 -- via service_role. Segue as convenções das tabelas irmãs (wep_checkout,
 -- wep_vendas, wep_pesquisa): id inteiro auto, data/hora separados, UTMs em text.
 --
--- OBS 1: `utm_campaing` mantém o typo proposital — é o mesmo nome usado em
---        wep_vendas, para os joins/consultas ficarem consistentes.
+-- OBS 1: aqui a coluna é `utm_campaign` (grafia CORRETA). Cuidado: a tabela
+--        wep_vendas usa `utm_campaing` (com typo) — são nomes diferentes.
 -- OBS 2: `created_at` não estava na lista pedida, mas TODAS as tabelas irmãs
 --        têm (auditoria, preenchido sozinho). Se não quiser, remova a linha.
 -- ============================================================================
@@ -20,7 +20,8 @@ create table if not exists mkt_wep.wep_cadastro (
   sobrenome      text,
   telefone       text,
   tel_8d         text,
-  utm_campaing   text,   -- typo proposital (igual a wep_vendas)
+  email          text,
+  utm_campaign   text,   -- grafia correta (≠ wep_vendas, que tem o typo utm_campaing)
   utm_term       text,
   utm_medium     text,
   utm_content    text,

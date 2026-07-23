@@ -3,7 +3,7 @@
 --
 -- 1) Meta de leads em wep_tags (200 por tag).
 -- 2) fn_kpis: passa a devolver `leads` + `meta_leads` (contador do KPI).
--- 3) fn_trafego: nova coluna `leads` por campanha (via utm_campaing).
+-- 3) fn_trafego: nova coluna `leads` por campanha (via utm_campaign).
 --
 -- ⚠️ fn_kpis e fn_trafego MUDAM o retorno → o Postgres não deixa
 --    `create or replace` alterar colunas de saída, então dropamos antes.
@@ -106,7 +106,7 @@ $$;
 
 -- 3) fn_trafego (+ leads por campanha/conjunto/anúncio) ----------------------
 -- Leads atribuídos pelas UTMs, MESMA lógica das vendas: join do cadastro em
--- dim_anuncios por (utm_campaing = campanha) e (utm_content = anúncio). Assim
+-- dim_anuncios por (utm_campaign = campanha) e (utm_content = anúncio). Assim
 -- os leads somam nos três níveis (campanha, conjunto, anúncio).
 drop function if exists mkt_wep.fn_trafego(date, date);
 create function mkt_wep.fn_trafego(
@@ -148,13 +148,13 @@ as $$
     group by grouping sets ((campanha), (campanha, conjunto), (campanha, conjunto, anuncio))
   ),
   -- Leads atribuídos por UTM nos 3 níveis (igual a vds): o cadastro entra em
-  -- dim_anuncios por campanha (utm_campaing) + anúncio (utm_content), e daí sai
+  -- dim_anuncios por campanha (utm_campaign) + anúncio (utm_content), e daí sai
   -- o conjunto. Leads sem match num anúncio WEP não entram (mesmo critério das vendas).
   lds as (
     select d.campanha, d.conjunto, d.anuncio, count(*) as leads
     from mkt_wep.wep_cadastro c
     join mkt_wep.dim_anuncios d
-      on  c.utm_campaing = d.campanha
+      on  c.utm_campaign = d.campanha
       and c.utm_content  = d.anuncio
     where (p_from is null or c.data >= p_from) and (p_to is null or c.data <= p_to)
     group by grouping sets ((d.campanha), (d.campanha, d.conjunto), (d.campanha, d.conjunto, d.anuncio))
@@ -229,5 +229,6 @@ as $$
     coalesce(l.leads, 0)          as leads
   from base b
   full join lds l on b.pagina = l.pagina
+  where coalesce(b.pagina, l.pagina) not ilike '%tkp%'  -- fora as páginas de obrigado
   order by page_views desc;
 $$;
