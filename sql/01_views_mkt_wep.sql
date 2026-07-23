@@ -147,6 +147,7 @@ select
   sum(usuarios_unicos) as usuarios_unicos
 from core.paginas_ga4
 where caminho_da_pagina ilike '%wep%'
+  and caminho_da_pagina not ilike '%tkp%'   -- fora as páginas de obrigado (ver 17_excluir_tkp_ga4.sql)
 group by data, mkt_wep.norm_pagina(caminho_da_pagina);
 
 -- ----------------------------------------------------------------------------

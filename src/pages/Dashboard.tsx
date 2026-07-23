@@ -47,13 +47,16 @@ interface DashboardProps {
   onLogout?: () => void
 }
 
+// Período padrão ao abrir o painel: janela do evento de captação atual.
+// Ajustar aqui quando houver um novo lançamento.
+const PERIODO_PADRAO = { from: '2026-07-23', to: '2026-08-02' }
+
 export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const [tags, setTags] = useState<TagWindow[]>([])
   const [filters, setFilters] = useState<Filters>({
     tag: 'Todas',
-    // Placeholder amplo até as tags carregarem e definirem a janela.
-    from: '2025-01-01',
-    to: '2026-12-31',
+    from: PERIODO_PADRAO.from,
+    to: PERIODO_PADRAO.to,
     campanha: null,
     conjunto: null,
     anuncio: null,
@@ -104,16 +107,13 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
 
   const { data, loading, error } = useDashboardData(filters)
 
-  // Carrega tags + define o período inicial pela tag selecionada.
+  // Carrega as tags para o seletor. O período inicial fica no PERIODO_PADRAO
+  // (evento atual) e NÃO é sobrescrito pela janela da tag ao abrir — só muda
+  // quando o usuário escolhe uma tag específica no Header (ver handleChange).
   useEffect(() => {
     fetchTags()
-      .then((ts) => {
-        setTags(ts)
-        const w = windowForTag(filters.tag, ts)
-        if (w.from && w.to) setFilters((f) => ({ ...f, from: w.from!, to: w.to! }))
-      })
+      .then((ts) => setTags(ts))
       .catch(() => setTags([]))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const tagNames = ['Todas', ...tags.map((t) => t.tag)]
