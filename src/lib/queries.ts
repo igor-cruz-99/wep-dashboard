@@ -85,6 +85,7 @@ interface KpiRow {
   meta_leads: number
   meta_investimento: number
   meta_cpl: number
+  base_qualificacao: number
 }
 interface FunilRow { etapa: string; valor: number; ordem: number }
 interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number; page_views: number }
@@ -129,8 +130,9 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
 
   // Entrada Grupo = % dos leads que entraram no grupo (entradas ÷ leads).
   const grupoPct = num(r.leads) > 0 ? (num(r.entradas_grupo) / num(r.leads)) * 100 : 0
-  // Qualificação = qualificados (renda >10k, cadastro OU pesquisa) ÷ LEADS.
-  const qualifPct = num(r.leads) > 0 ? (num(r.qualificados) / num(r.leads)) * 100 : 0
+  // Qualificação = qualificados (renda >10k) ÷ base avaliável (quem respondeu a
+  // pesquisa OU veio do forms nativo). Denominador vem pronto da RPC.
+  const qualifPct = num(r.base_qualificacao) > 0 ? (num(r.qualificados) / num(r.base_qualificacao)) * 100 : 0
   const cpl = num(r.leads) > 0 ? num(r.investimento) / num(r.leads) : 0
 
   // Num recorte parcial de origem (só Páginas ou só Nativo), Vendas/CAC não são
