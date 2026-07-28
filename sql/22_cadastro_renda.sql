@@ -1,0 +1,26 @@
+-- ============================================================================
+-- RENDA + QUALIFICACAO na captação (Fase 2 de qualificados) — independente do 21.
+--
+-- Contexto: o formulário nativo passa a captar a renda (em faixa). O critério de
+-- "qualificado" agora vale para as DUAS fontes:
+--   • captação (wep_cadastro.renda) — novas colunas abaixo
+--   • pesquisa  (wep_pesquisa.qualificacao) — JÁ existe ('1' quando renda ≥ 10k)
+--
+-- Espelhamos a pesquisa: guardamos a renda (faixa/rótulo, também serve aos
+-- gráficos de perfil) E um flag `qualificacao` text '1'/'0' que a automação do
+-- Make preenche ('1' quando a faixa é ≥ 10k). Assim o dashboard conta igual dos
+-- dois lados: quem tem qualificacao = '1'.
+--
+-- Faixas do formulário e a régua (chave crua → qualificado?):
+--   ate_5k        → 0
+--   de_5_a_10k    → 0
+--   de_10_a_15k   → 1   (≥ 10k, igual à pesquisa)
+--   de_15_a_20k   → 1
+--   de_20_a_30k   → 1
+--   acima_de_30k  → 1
+--
+-- Seguro adicionar: as RPCs leem mkt_wep.wep_cadastro direto (não via `select *`),
+-- então NÃO tem a armadilha da vw_tags — não precisa recriar view nenhuma.
+-- ============================================================================
+alter table mkt_wep.wep_cadastro add column if not exists renda text;
+alter table mkt_wep.wep_cadastro add column if not exists qualificacao text;

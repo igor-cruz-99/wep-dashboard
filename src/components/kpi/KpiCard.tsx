@@ -32,6 +32,21 @@ export function TrendArrow({ up, color }: { up: boolean; color: string }) {
  *  - barra de progresso (verde-claro→verde-escuro quando positivo)
  */
 export function KpiCard({ kpi }: { kpi: Kpi }) {
+  // Sem dimensão de origem no recorte atual: card neutro com "—" e uma nota.
+  if (kpi.na) {
+    return (
+      <Panel className="relative overflow-hidden px-4 pb-4 pt-3">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">
+            {kpi.label}
+          </span>
+        </div>
+        <p className="mt-2 text-3xl font-bold tracking-tight text-muted/50">—</p>
+        <p className="mt-1 text-[11px] text-muted/70">sem recorte por origem</p>
+      </Panel>
+    )
+  }
+
   // Sem meta (ex.: CPL): card mostra só o valor, sem %meta/seta/barra.
   const hasMeta = typeof kpi.meta === 'number' && kpi.meta > 0
   const pct = hasMeta ? (kpi.value / (kpi.meta as number)) * 100 : 0

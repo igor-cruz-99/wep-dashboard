@@ -1,9 +1,12 @@
 import { supabaseAuth } from './supabase'
 import { DEV_SKIP_AUTH } from './devAuth'
 import type {
+  CplOrigem,
+  TrafegoOrganico,
   DailyPoint,
   FunnelStage,
   Kpi,
+  OrigemLeadRow,
   PageRow,
   PerfilDatum,
   PesquisaPerfil,
@@ -21,6 +24,20 @@ function rpcParams(filters: Filters) {
     p_from: filters.from || null,
     p_to: filters.to || null,
   }
+}
+
+/**
+ * Recorte de origem para a RPC. Só mandamos `p_origem` quando há recorte
+ * ('pagina'/'nativo'); no 'todas' omitimos a chave — assim o painel continua
+ * funcionando mesmo antes de a migração 21_origem.sql estar aplicada no banco.
+ */
+function origemParam(filters: Filters): { p_origem?: string } {
+  return !filters.origem || filters.origem === 'todas' ? {} : { p_origem: filters.origem }
+}
+
+/** params com tag + período + recorte de origem (para as RPCs que aceitam p_origem). */
+function rpcParamsO(filters: Filters) {
+  return { ...rpcParams(filters), ...origemParam(filters) }
 }
 
 /**
@@ -106,21 +123,27 @@ export interface KpisResult {
 }
 
 export async function fetchKpis(filters: Filters): Promise<KpisResult> {
-  const data = await callApi<KpiRow[]>('fn_kpis', rpcParams(filters))
+  const data = await callApi<KpiRow[]>('fn_kpis', rpcParamsO(filters))
   const r = (data?.[0] ?? {}) as Partial<KpiRow>
   const num = (v: number | undefined) => Number(v ?? 0)
 
   // Entrada Grupo = % dos leads que entraram no grupo (entradas ÷ leads).
   const grupoPct = num(r.leads) > 0 ? (num(r.entradas_grupo) / num(r.leads)) * 100 : 0
-  const qualifPct = num(r.pesquisas) > 0 ? (num(r.qualificados) / num(r.pesquisas)) * 100 : 0
+  // Qualificação = qualificados (renda >10k, cadastro OU pesquisa) ÷ LEADS.
+  const qualifPct = num(r.leads) > 0 ? (num(r.qualificados) / num(r.leads)) * 100 : 0
   const cpl = num(r.leads) > 0 ? num(r.investimento) / num(r.leads) : 0
+
+  // Num recorte parcial de origem (só Páginas ou só Nativo), Vendas/CAC não são
+  // atribuíveis → mostram "—". Qualificação (por lead) e Entrada Grupo (por
+  // tel_8d) SÃO segmentáveis, então não levam "—".
+  const semOrigem = filters.origem !== 'todas'
 
   const cards: Kpi[] = [
     { id: 'investimento', label: 'Investimento', value: num(r.investimento), meta: num(r.meta_investimento), format: 'brl', direction: 'inverse' },
     { id: 'leads', label: 'Leads', value: num(r.leads), meta: num(r.meta_leads), format: 'int', direction: 'normal' },
     { id: 'cpl', label: 'CPL', value: cpl, meta: num(r.meta_cpl), format: 'brl', direction: 'inverse' },
-    { id: 'vendas', label: 'Vendas Ingressos', value: num(r.vendas_count), meta: num(r.meta_vendas), format: 'int', direction: 'normal' },
-    { id: 'cac', label: 'CAC', value: num(r.cac), meta: num(r.meta_cac), format: 'brl', direction: 'inverse' },
+    { id: 'vendas', label: 'Vendas Ingressos', value: num(r.vendas_count), meta: num(r.meta_vendas), format: 'int', direction: 'normal', na: semOrigem },
+    { id: 'cac', label: 'CAC', value: num(r.cac), meta: num(r.meta_cac), format: 'brl', direction: 'inverse', na: semOrigem },
     { id: 'grupo', label: 'Entrada Grupo', value: grupoPct, meta: num(r.meta_grupo), format: 'pct', direction: 'normal' },
     { id: 'qualificacao', label: 'Qualificação', value: qualifPct, meta: num(r.meta_qualificacao), format: 'pct', direction: 'normal' },
   ]
@@ -129,7 +152,7 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
 
 // ── Funil ───────────────────────────────────────────────────────────────────
 export async function fetchFunnel(filters: Filters): Promise<FunnelStage[]> {
-  const data = await callApi<FunilRow[]>('fn_funil', rpcParams(filters))
+  const data = await callApi<FunilRow[]>('fn_funil', rpcParamsO(filters))
   return (data ?? []).map((r) => ({
     label: r.etapa,
     value: Number(r.valor),
@@ -146,7 +169,7 @@ export async function fetchSeries(filters: Filters): Promise<{
   investimentoPorDia: DailyPoint[]
   conversaoPorDia: DailyPoint[]
 }> {
-  const rows = (await callApi<SerieRow[]>('fn_serie_diaria', rpcParams(filters))) ?? []
+  const rows = (await callApi<SerieRow[]>('fn_serie_diaria', rpcParamsO(filters))) ?? []
   const pick = (key: keyof SerieRow): DailyPoint[] =>
     rows.map((r) => ({ date: r.data, value: Number(r[key] ?? 0) }))
   return {
@@ -170,6 +193,7 @@ export async function fetchTraffic(filters: Filters): Promise<TrafficRow[]> {
   const data = await callApi<TrafegoRow[]>('fn_trafego', {
     p_from: filters.from || null,
     p_to: filters.to || null,
+    ...origemParam(filters),
   })
   return (data ?? []).map((r, i) => ({
     id: `${r.campanha ?? ''}|${r.conjunto ?? ''}|${r.anuncio ?? ''}|${i}`,
@@ -194,6 +218,7 @@ export async function fetchPages(filters: Filters): Promise<PageRow[]> {
   const data = await callApi<PaginaRow[]>('fn_paginas', {
     p_from: filters.from || null,
     p_to: filters.to || null,
+    ...origemParam(filters),
   })
   return (data ?? []).map((r) => ({
     id: r.pagina,
@@ -204,6 +229,64 @@ export async function fetchPages(filters: Filters): Promise<PageRow[]> {
     leads: Number(r.leads ?? 0), // tolera fn_paginas antiga (sem leads) até rodar o 11_leads.sql
     pesquisa: 0, // pesquisa não é por página no modelo atual — ver pendência
   }))
+}
+
+// ── Origem dos Leads (tabela: de qual página/forms, quantos e %) ────────────
+// Quadro completo: NÃO aplica o recorte de origem (mostra todas as origens, o %
+// é sobre o total). Só tag + período.
+export async function fetchOrigemLeads(filters: Filters): Promise<OrigemLeadRow[]> {
+  let data: OrigemLeadRow[]
+  try {
+    data = (await callApi<OrigemLeadRow[]>('fn_origem_leads', rpcParams(filters))) ?? []
+  } catch (err) {
+    // Bloco opcional: se a RPC (24_...sql) ainda não foi aplicada, não derruba o
+    // painel — a tabela fica vazia e o resto carrega normal.
+    console.warn('fn_origem_leads indisponível:', (err as Error)?.message)
+    return []
+  }
+  return data.map((r) => ({
+    origem: r.origem,
+    leads: Number(r.leads ?? 0),
+    pct: Number(r.pct ?? 0),
+  }))
+}
+
+// ── CPL por origem (card: Páginas x Forms nativo) ───────────────────────────
+interface CplOrigemRow { origem: string; investimento: number; leads: number; cpl: number }
+const CPL_LADO_VAZIO = { investimento: 0, leads: 0, cpl: 0 }
+
+export async function fetchCplOrigem(filters: Filters): Promise<CplOrigem> {
+  let rows: CplOrigemRow[]
+  try {
+    rows = (await callApi<CplOrigemRow[]>('fn_cpl_origem', rpcParams(filters))) ?? []
+  } catch (err) {
+    console.warn('fn_cpl_origem indisponível:', (err as Error)?.message)
+    return { pagina: { ...CPL_LADO_VAZIO }, nativo: { ...CPL_LADO_VAZIO } }
+  }
+  const find = (o: string) => {
+    const r = rows.find((x) => x.origem === o)
+    return {
+      investimento: Number(r?.investimento ?? 0),
+      leads: Number(r?.leads ?? 0),
+      cpl: Number(r?.cpl ?? 0),
+    }
+  }
+  return { pagina: find('pagina'), nativo: find('nativo') }
+}
+
+// ── Tráfego x Orgânico (pizza) ──────────────────────────────────────────────
+interface TrafOrgRow { tipo: string; leads: number }
+
+export async function fetchTrafegoOrganico(filters: Filters): Promise<TrafegoOrganico> {
+  let rows: TrafOrgRow[]
+  try {
+    rows = (await callApi<TrafOrgRow[]>('fn_trafego_organico', rpcParams(filters))) ?? []
+  } catch (err) {
+    console.warn('fn_trafego_organico indisponível:', (err as Error)?.message)
+    return { trafego: 0, organico: 0 }
+  }
+  const g = (t: string) => Number(rows.find((x) => x.tipo === t)?.leads ?? 0)
+  return { trafego: g('trafego'), organico: g('organico') }
 }
 
 // ── Perfil das pesquisas (4 gráficos) ───────────────────────────────────────

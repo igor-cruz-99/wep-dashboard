@@ -11,6 +11,41 @@ export interface Kpi {
   format: 'int' | 'brl' | 'pct'
   /** Direção da cor da %meta. CAC é 'inverse'. */
   direction: MetaDirection
+  /**
+   * Sem dimensão de origem: quando o filtro está num recorte parcial
+   * (só Páginas ou só Nativo) e esta métrica não sabe se separar por origem,
+   * o card mostra "—" em vez de repetir o total (Vendas, CAC, Grupo, Qualificação).
+   */
+  na?: boolean
+}
+
+/** Recorte por origem da captação (teste A/B: páginas vs formulário nativo). */
+export type Origem = 'todas' | 'pagina' | 'nativo'
+
+/** Linha da tabela "Origem dos Leads": de qual página/forms veio, quantos e %. */
+export interface OrigemLeadRow {
+  origem: string
+  leads: number
+  pct: number
+}
+
+/** CPL de uma origem (investimento ÷ leads daquele lado). */
+export interface CplOrigemLado {
+  investimento: number
+  leads: number
+  cpl: number
+}
+
+/** Card "CPL por origem": Páginas x Formulário nativo. */
+export interface CplOrigem {
+  pagina: CplOrigemLado
+  nativo: CplOrigemLado
+}
+
+/** Pizza "Tráfego x Orgânico": leads por origem de aquisição (utm_campaign). */
+export interface TrafegoOrganico {
+  trafego: number
+  organico: number
 }
 
 /** Ponto de uma série diária (gráficos de linha). */
@@ -98,6 +133,8 @@ export interface Filters {
   tag: string | null
   from: string
   to: string
+  /** Recorte por origem da captação: 'todas' | 'pagina' | 'nativo'. */
+  origem: Origem
   campanha: string | null
   conjunto: string | null
   anuncio: string | null

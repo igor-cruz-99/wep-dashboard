@@ -28,6 +28,9 @@ const ALLOWED_RPC = new Set([
   'fn_trafego',
   'fn_paginas',
   'fn_pesquisa_perfil',
+  'fn_origem_leads',
+  'fn_cpl_origem',
+  'fn_trafego_organico',
   'fn_seal_resumo',
   'fn_seal_compradores',
 ])

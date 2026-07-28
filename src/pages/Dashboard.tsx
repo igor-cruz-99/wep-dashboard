@@ -5,6 +5,9 @@ import { ChartCard } from '../components/charts/ChartCard'
 import { Funnel } from '../components/funnel/Funnel'
 import { TrafficTable } from '../components/tables/TrafficTable'
 import { PagesTable } from '../components/tables/PagesTable'
+import { OrigemLeadsTable } from '../components/tables/OrigemLeadsTable'
+import { CplOrigemCard } from '../components/kpi/CplOrigemCard'
+import { TrafegoOrganicoPie } from '../components/charts/TrafegoOrganicoPie'
 import { PesquisaCharts } from '../components/pesquisa/PesquisaCharts'
 import { SealCards } from '../components/seal/SealCards'
 import { SealBuyersTable } from '../components/seal/SealBuyersTable'
@@ -23,6 +26,22 @@ const SERIES = {
   conversaoLeads: '#8fbf7f', // linha (verde) do combo Leads|Conversão
   investimento: '#c9945f',
   conversao: '#c9945f',
+}
+
+/**
+ * Placeholder para gráficos sem dimensão de origem (Vendas|CAC, Conversão
+ * Checkout) quando há recorte parcial — mostra "—" em vez de repetir o total.
+ */
+function NaChart({ title }: { title: string }) {
+  return (
+    <Panel className="flex min-h-[224px] flex-1 flex-col p-4">
+      <p className="text-sm font-semibold text-cream">{title}</p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
+        <p className="text-3xl font-bold text-muted/40">—</p>
+        <p className="text-[11px] text-muted/70">sem recorte por origem</p>
+      </div>
+    </Panel>
+  )
 }
 
 /**
@@ -57,6 +76,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
     tag: 'Todas',
     from: PERIODO_PADRAO.from,
     to: PERIODO_PADRAO.to,
+    origem: 'todas',
     campanha: null,
     conjunto: null,
     anuncio: null,
@@ -160,7 +180,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
         filters={filters}
         tags={tagNames}
         onChange={handleChange}
-        onClearFilters={() => handleChange({ tag: 'Todas' })}
+        onClearFilters={() => handleChange({ tag: 'Todas', origem: 'todas' })}
         activePreset={activePreset}
         onPreset={applyPreset}
         userEmail={userEmail}
@@ -194,15 +214,19 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           {/* Gráficos + funil */}
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr_1fr]">
             <div className="flex flex-col gap-4">
-              <ChartCard
-                title="Vendas por dia | CAC"
-                data={data.series.vendasPorDia}
-                kind="bar"
-                color={SERIES.vendas}
-                seriesLabel="Vendas"
-                line={{ data: data.series.cacPorDia, color: SERIES.cac, label: 'CAC', format: 'brl' }}
-                onSelectDay={selectDay}
-              />
+              {filters.origem !== 'todas' ? (
+                <NaChart title="Vendas por dia | CAC" />
+              ) : (
+                <ChartCard
+                  title="Vendas por dia | CAC"
+                  data={data.series.vendasPorDia}
+                  kind="bar"
+                  color={SERIES.vendas}
+                  seriesLabel="Vendas"
+                  line={{ data: data.series.cacPorDia, color: SERIES.cac, label: 'CAC', format: 'brl' }}
+                  onSelectDay={selectDay}
+                />
+              )}
               <ChartCard
                 title="Leads por dia | Conversão"
                 data={data.series.leadsPorDia}
@@ -231,14 +255,25 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                 headlineFormat="brl"
                 onSelectDay={selectDay}
               />
-              <ChartCard
-                title="Conversão Checkout por dia"
-                data={data.series.conversaoPorDia}
-                kind="area"
-                color={SERIES.conversao}
-                onSelectDay={selectDay}
-              />
+              {filters.origem !== 'todas' ? (
+                <NaChart title="Conversão Checkout por dia" />
+              ) : (
+                <ChartCard
+                  title="Conversão Checkout por dia"
+                  data={data.series.conversaoPorDia}
+                  kind="area"
+                  color={SERIES.conversao}
+                  onSelectDay={selectDay}
+                />
+              )}
             </div>
+          </div>
+
+          {/* Origem dos Leads | CPL por origem | Tráfego x Orgânico */}
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <OrigemLeadsTable rows={data.origemLeads} />
+            <CplOrigemCard data={data.cplOrigem} />
+            <TrafegoOrganicoPie data={data.trafegoOrganico} />
           </div>
 
           {/* Tabelas + Pesquisa + SEAL */}

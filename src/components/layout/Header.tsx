@@ -1,4 +1,4 @@
-import type { Filters } from '../../types'
+import type { Filters, Origem } from '../../types'
 
 export type Preset = '30D' | '7D' | '1D'
 
@@ -23,6 +23,19 @@ export function Header({
   userEmail,
   onLogout,
 }: HeaderProps) {
+  // Recorte de origem via dois checks. 'todas' = os dois marcados.
+  const paginaOn = filters.origem === 'todas' || filters.origem === 'pagina'
+  const nativoOn = filters.origem === 'todas' || filters.origem === 'nativo'
+  const toggleOrigem = (which: 'pagina' | 'nativo') => {
+    const nextPagina = which === 'pagina' ? !paginaOn : paginaOn
+    const nextNativo = which === 'nativo' ? !nativoOn : nativoOn
+    // Nunca deixa os dois desmarcados (equivale a "não mostrar nada") → volta pra 'todas'.
+    let origem: Origem = 'todas'
+    if (nextPagina && !nextNativo) origem = 'pagina'
+    else if (!nextPagina && nextNativo) origem = 'nativo'
+    onChange({ origem })
+  }
+
   return (
     <header className="flex items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
@@ -76,6 +89,40 @@ export function Header({
             ))}
           </select>
         </label>
+
+        {/* Filtro de Origem (recorte da captação: páginas vs formulário nativo) */}
+        <div className="flex h-10 items-center gap-1 rounded-xl border border-line bg-card px-2">
+          <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+            Origem
+          </span>
+          {([
+            { key: 'pagina', label: 'Páginas', on: paginaOn },
+            { key: 'nativo', label: 'Forms nativo', on: nativoOn },
+          ] as const).map((o) => (
+            <button
+              key={o.key}
+              onClick={() => toggleOrigem(o.key)}
+              aria-pressed={o.on}
+              className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors ${
+                o.on ? 'text-cream' : 'text-muted/60 hover:text-muted'
+              }`}
+            >
+              <span
+                className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                  o.on ? 'border-gold bg-gold text-[#191210]' : 'border-line bg-card-2'
+                }`}
+                aria-hidden
+              >
+                {o.on && (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                )}
+              </span>
+              {o.label}
+            </button>
+          ))}
+        </div>
 
         {/* Atalhos de período: 30D / 7D / 1D (toggle) */}
         {onPreset && (

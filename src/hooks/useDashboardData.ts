@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react'
 import {
+  fetchCplOrigem,
   fetchFunnel,
   fetchKpis,
+  fetchOrigemLeads,
   fetchPages,
   fetchPesquisaPerfil,
+  fetchTrafegoOrganico,
   fetchSealCompradores,
   fetchSealResumo,
   fetchSeries,
   fetchTraffic,
 } from '../lib/queries'
 import type {
+  CplOrigem,
+  TrafegoOrganico,
   DailyPoint,
   Filters,
   FunnelStage,
   Kpi,
+  OrigemLeadRow,
   PageRow,
   PesquisaPerfil,
   SealComprador,
@@ -34,6 +40,9 @@ export interface DashboardData {
   }
   traffic: TrafficRow[]
   pages: PageRow[]
+  origemLeads: OrigemLeadRow[]
+  cplOrigem: CplOrigem
+  trafegoOrganico: TrafegoOrganico
   perfil: PesquisaPerfil
   /** Resumo do bloco Pesquisa: nº de respostas e % sobre os leads. */
   pesquisaResumo: { respostas: number; leads: number }
@@ -70,11 +79,14 @@ export function useDashboardData(filters: Filters): State {
       fetchSeries(filters),
       fetchTraffic(filters),
       fetchPages(filters),
+      fetchOrigemLeads(filters),
+      fetchCplOrigem(filters),
+      fetchTrafegoOrganico(filters),
       fetchPesquisaPerfil(filters),
       fetchSealResumo(filters),
       fetchSealCompradores(filters),
     ])
-      .then(([kpiRes, funnel, series, traffic, pages, perfil, seal, sealCompradores]) => {
+      .then(([kpiRes, funnel, series, traffic, pages, origemLeads, cplOrigem, trafegoOrganico, perfil, seal, sealCompradores]) => {
         if (cancelled) return
         setState({
           data: {
@@ -83,6 +95,9 @@ export function useDashboardData(filters: Filters): State {
             series,
             traffic,
             pages,
+            origemLeads,
+            cplOrigem,
+            trafegoOrganico,
             perfil,
             pesquisaResumo: { respostas: kpiRes.respostasPesquisa, leads: kpiRes.leads },
             seal,
