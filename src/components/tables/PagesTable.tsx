@@ -17,17 +17,22 @@ interface Column {
   heat: HeatMode
 }
 
-const columns: Column[] = [
-  { label: 'Página', get: (r) => r.pagina, fmt: (r) => r.pagina, num: false, agg: 'none', fmtAgg: () => '', heat: 'none' },
-  { label: 'Page View', get: (r) => r.pageView, fmt: (r) => formatInt(r.pageView), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
-  { label: 'Checkout', get: (r) => r.checkout, fmt: (r) => formatInt(r.checkout), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
-  { label: 'Vendas', get: (r) => r.vendas, fmt: (r) => formatInt(r.vendas), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
-  { label: 'Leads', get: (r) => r.leads, fmt: (r) => formatInt(r.leads), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
-  { label: 'Pesquisa', get: (r) => r.pesquisa, fmt: (r) => formatInt(r.pesquisa), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
-  { label: 'Checkout x Venda', get: (r) => ratio(r.vendas, r.checkout), fmt: (r) => formatPct(ratio(r.vendas, r.checkout)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
-  { label: 'Visita x Checkout', get: (r) => ratio(r.checkout, r.pageView), fmt: (r) => formatPct(ratio(r.checkout, r.pageView)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
-  { label: 'Visita x Venda', get: (r) => ratio(r.vendas, r.pageView), fmt: (r) => formatPct(ratio(r.vendas, r.pageView)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
-]
+/** Todas as colunas possíveis, por chave — cada tabela escolhe as suas. */
+export type PageColKey =
+  | 'pagina' | 'pageView' | 'checkout' | 'vendas' | 'leads' | 'pesquisa'
+  | 'checkoutVenda' | 'visitaCheckout' | 'visitaVenda'
+
+const ALL_COLUMNS: Record<PageColKey, Column> = {
+  pagina: { label: 'Página', get: (r) => r.pagina, fmt: (r) => r.pagina, num: false, agg: 'none', fmtAgg: () => '', heat: 'none' },
+  pageView: { label: 'Page View', get: (r) => r.pageView, fmt: (r) => formatInt(r.pageView), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+  checkout: { label: 'Checkout', get: (r) => r.checkout, fmt: (r) => formatInt(r.checkout), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+  vendas: { label: 'Vendas', get: (r) => r.vendas, fmt: (r) => formatInt(r.vendas), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+  leads: { label: 'Leads', get: (r) => r.leads, fmt: (r) => formatInt(r.leads), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+  pesquisa: { label: 'Pesquisa', get: (r) => r.pesquisa, fmt: (r) => formatInt(r.pesquisa), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+  checkoutVenda: { label: 'Checkout x Venda', get: (r) => ratio(r.vendas, r.checkout), fmt: (r) => formatPct(ratio(r.vendas, r.checkout)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
+  visitaCheckout: { label: 'Visita x Checkout', get: (r) => ratio(r.checkout, r.pageView), fmt: (r) => formatPct(ratio(r.checkout, r.pageView)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
+  visitaVenda: { label: 'Visita x Venda', get: (r) => ratio(r.vendas, r.pageView), fmt: (r) => formatPct(ratio(r.vendas, r.pageView)), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
+}
 
 /** Soma ou média de uma coluna sobre as linhas visíveis. */
 function aggregate(rows: PageRow[], get: (r: PageRow) => number, mode: 'sum' | 'avg') {
@@ -36,9 +41,19 @@ function aggregate(rows: PageRow[], get: (r: PageRow) => number, mode: 'sum' | '
   return mode === 'avg' ? sum / rows.length : sum
 }
 
-export function PagesTable({ rows }: { rows: PageRow[] }) {
+interface PagesTableProps {
+  rows: PageRow[]
+  /** Quais colunas mostrar, na ordem. */
+  colKeys: PageColKey[]
+  title: string
+  overline?: string
+}
+
+export function PagesTable({ rows, colKeys, title, overline = 'Análise' }: PagesTableProps) {
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<{ idx: number; dir: 'asc' | 'desc' } | null>(null)
+
+  const columns = useMemo(() => colKeys.map((k) => ALL_COLUMNS[k]), [colKeys])
 
   const view = useMemo(() => {
     const filtered = rows.filter((r) => r.pagina.toLowerCase().includes(q.trim().toLowerCase()))
@@ -52,7 +67,7 @@ export function PagesTable({ rows }: { rows: PageRow[] }) {
         : String(av).localeCompare(String(bv), 'pt-BR')
       return sort.dir === 'desc' ? -cmp : cmp
     })
-  }, [rows, q, sort])
+  }, [rows, q, sort, columns])
 
   // Faixa (min/max) por coluna para o mapa de calor.
   const bounds = useMemo(
@@ -62,7 +77,7 @@ export function PagesTable({ rows }: { rows: PageRow[] }) {
         const vals = view.map((r) => Number(c.get(r)))
         return { min: Math.min(...vals), max: Math.max(...vals) }
       }),
-    [view]
+    [view, columns]
   )
 
   const onSort = (idx: number) =>
@@ -71,7 +86,7 @@ export function PagesTable({ rows }: { rows: PageRow[] }) {
   return (
     <Panel className="p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle overline="Análise" title="Desempenho por página" />
+        <SectionTitle overline={overline} title={title} />
         <div className="flex w-full max-w-xs items-center gap-2 rounded-full border border-line bg-card-2 px-4 py-2">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
             <circle cx="11" cy="11" r="7" stroke="#a3907a" strokeWidth="2" />

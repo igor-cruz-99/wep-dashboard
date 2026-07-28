@@ -279,7 +279,16 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           {/* Tabelas + Pesquisa + SEAL */}
           <div className="mt-6 flex flex-col gap-6">
             <TrafficTable rows={data.traffic} />
-            <PagesTable rows={data.pages} />
+            <PagesTable
+              rows={data.pages.filter((p) => /cap|forms/i.test(p.pagina))}
+              title="Desempenho página de captação"
+              colKeys={['pagina', 'pageView', 'leads', 'pesquisa']}
+            />
+            <PagesTable
+              rows={data.pages.filter((p) => /vend/i.test(p.pagina))}
+              title="Desempenho página de vendas"
+              colKeys={['pagina', 'pageView', 'checkout', 'vendas', 'checkoutVenda', 'visitaCheckout', 'visitaVenda']}
+            />
             <PesquisaCharts
               perfil={data.perfil}
               respostas={data.pesquisaResumo.respostas}

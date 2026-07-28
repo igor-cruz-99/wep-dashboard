@@ -102,7 +102,7 @@ interface TrafegoRow {
   hold: number
   body: number
 }
-interface PaginaRow { pagina: string; page_views: number; checkouts: number; vendas: number; leads: number }
+interface PaginaRow { pagina: string; page_views: number; checkouts: number; vendas: number; leads: number; pesquisa: number }
 interface PerfilRow { dimensao: string; categoria: string; total: number }
 interface SealRow { situacao: string; alunos: number; valor_total: number }
 interface SealCompradorRow {
@@ -228,8 +228,8 @@ export async function fetchPages(filters: Filters): Promise<PageRow[]> {
     pageView: Number(r.page_views),
     checkout: Number(r.checkouts),
     vendas: Number(r.vendas),
-    leads: Number(r.leads ?? 0), // tolera fn_paginas antiga (sem leads) até rodar o 11_leads.sql
-    pesquisa: 0, // pesquisa não é por página no modelo atual — ver pendência
+    leads: Number(r.leads ?? 0),
+    pesquisa: Number(r.pesquisa ?? 0), // via email wep_pesquisa↔wep_cadastro (sql/28)
   }))
 }
 
