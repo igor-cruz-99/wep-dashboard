@@ -5,7 +5,7 @@ import { formatInt, formatPct } from '../../utils/format'
 /** Encurta o caminho da página pra um rótulo legível (tira o prefixo comum). */
 function pretty(o: string): string {
   if (!o.startsWith('/')) return o // "Formulário nativo", "(sem origem)"
-  return o.replace('/imersao-engenheiro-patrimonial-', '')
+  return o.replace(/^\/imersao-(?:engenheiro|estrategista)-patrimonial-/, '')
 }
 
 /**
