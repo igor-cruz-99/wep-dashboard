@@ -41,6 +41,22 @@ function rpcParamsO(filters: Filters) {
 }
 
 /**
+ * Campanhas que a etapa PADRÃO esconde da página inteira (não só da tabela):
+ * o ad spend delas (investimento/alcance/impressões/cliques em vw_ads_diario)
+ * não deve contar em NADA no Padrão. Ex.: remarketing de lote zero.
+ */
+const PADRAO_CAMPANHAS_EXCLUIDAS = ['ls-WEP-WEPAGO26-p04-RMKT-lote-zero']
+
+/**
+ * Envia `p_excluir` só na etapa Padrão (identificada por grupo === 'padrao';
+ * Meteórico e SEAL usam 'pre_venda'). Fora dela, omite a chave — assim o painel
+ * segue funcionando mesmo antes de a migração 31 estar aplicada no banco.
+ */
+function excluirParam(filters: Filters): { p_excluir?: string[] } {
+  return filters.grupo === 'padrao' ? { p_excluir: PADRAO_CAMPANHAS_EXCLUIDAS } : {}
+}
+
+/**
  * Chama o "porteiro" (/api/dashboard) mandando o token da sessão.
  * O servidor valida a sessão e só então consulta o banco — o navegador
  * nunca fala direto com o Supabase de dados.
@@ -131,7 +147,11 @@ export interface KpisResult {
 }
 
 export async function fetchKpis(filters: Filters): Promise<KpisResult> {
-  const data = await callApi<KpiRow[]>('fn_kpis', { ...rpcParamsO(filters), p_grupo: filters.grupo })
+  const data = await callApi<KpiRow[]>('fn_kpis', {
+    ...rpcParamsO(filters),
+    p_grupo: filters.grupo,
+    ...excluirParam(filters),
+  })
   const r = (data?.[0] ?? {}) as Partial<KpiRow>
   const num = (v: number | undefined) => Number(v ?? 0)
 
@@ -161,7 +181,7 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
 
 // ── Funil ───────────────────────────────────────────────────────────────────
 export async function fetchFunnel(filters: Filters): Promise<FunnelStage[]> {
-  const data = await callApi<FunilRow[]>('fn_funil', rpcParamsO(filters))
+  const data = await callApi<FunilRow[]>('fn_funil', { ...rpcParamsO(filters), ...excluirParam(filters) })
   return (data ?? []).map((r) => ({
     label: r.etapa,
     value: Number(r.valor),
@@ -179,7 +199,7 @@ export async function fetchSeries(filters: Filters): Promise<{
   conversaoPorDia: DailyPoint[]
   pesquisaPorDia: DailyPoint[]
 }> {
-  const rows = (await callApi<SerieRow[]>('fn_serie_diaria', rpcParamsO(filters))) ?? []
+  const rows = (await callApi<SerieRow[]>('fn_serie_diaria', { ...rpcParamsO(filters), ...excluirParam(filters) })) ?? []
   const pick = (key: keyof SerieRow): DailyPoint[] =>
     rows.map((r) => ({ date: r.data, value: Number(r[key] ?? 0) }))
   return {
@@ -221,6 +241,7 @@ export async function fetchTraffic(filters: Filters): Promise<TrafficRow[]> {
     p_from: filters.from || null,
     p_to: filters.to || null,
     ...origemParam(filters),
+    ...excluirParam(filters),
   })
   return (data ?? []).map((r, i) => ({
     id: `${r.campanha ?? ''}|${r.conjunto ?? ''}|${r.anuncio ?? ''}|${i}`,

@@ -132,10 +132,6 @@ const SEAL_TAG_WINDOWS: Record<string, { from: string; to: string }> = {
   WEPAGO26: { from: '2026-07-23', to: '2026-08-31' },
 }
 
-// Campanhas ocultadas da tabela de tráfego na visão Padrão (não fazem parte
-// da análise dessa etapa — ex.: remarketing de lote zero).
-const PADRAO_CAMPANHAS_OCULTAS = ['ls-WEP-WEPAGO26-p04-RMKT-lote-zero']
-
 const VIEWS: Record<View, { overline: string; showOrigem: boolean; from: string; to: string }> = {
   meteorico: { overline: 'Dashboard Meteórico', showOrigem: true, from: '2026-07-23', to: '2026-07-30' },
   padrao: { overline: 'Dashboard Padrão', showOrigem: false, from: '2026-07-31', to: '2026-08-21' },
@@ -456,15 +452,10 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           {/* Análise + Pesquisa (Meteórico/Padrão) — SEAL tem seu próprio corpo */}
           {view !== 'seal' && (
             <div className="mt-6 flex flex-col gap-6">
-              {/* Tráfego por campanha: nas duas etapas. No Padrão, oculta as
-                  campanhas listadas (filtra campanha + seus conjuntos/anúncios). */}
-              <TrafficTable
-                rows={
-                  view === 'padrao'
-                    ? data.traffic.filter((r) => !r.campanha || !PADRAO_CAMPANHAS_OCULTAS.includes(r.campanha))
-                    : data.traffic
-                }
-              />
+              {/* Tráfego por campanha: nas duas etapas. No Padrão, as campanhas
+                  ocultas já saem na origem (fn_trafego + p_excluir, via queries.ts),
+                  então aqui é a lista pronta. */}
+              <TrafficTable rows={data.traffic} />
 
               {/* Página de captação (Meteórico) / de vendas (Padrão) */}
               {view === 'meteorico' ? (
