@@ -461,7 +461,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
               <TrafficTable
                 rows={
                   view === 'padrao'
-                    ? data.traffic.filter((r) => !PADRAO_CAMPANHAS_OCULTAS.includes(r.campanha))
+                    ? data.traffic.filter((r) => !r.campanha || !PADRAO_CAMPANHAS_OCULTAS.includes(r.campanha))
                     : data.traffic
                 }
               />
