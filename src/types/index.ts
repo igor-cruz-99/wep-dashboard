@@ -12,11 +12,13 @@ export interface Kpi {
   /** Direção da cor da %meta. CAC é 'inverse'. */
   direction: MetaDirection
   /**
-   * Sem dimensão de origem: quando o filtro está num recorte parcial
-   * (só Páginas ou só Nativo) e esta métrica não sabe se separar por origem,
-   * o card mostra "—" em vez de repetir o total (Vendas, CAC, Grupo, Qualificação).
+   * Card sem valor calculável no contexto atual → mostra "—" em vez do número.
+   * (ex.: métrica sem dimensão de origem num recorte parcial, ou grupo ainda
+   * não criado). A nota exibida vem de `naNote`.
    */
   na?: boolean
+  /** Texto sob o "—" quando na=true. Default: "sem recorte por origem". */
+  naNote?: string
 }
 
 /** Recorte por origem da captação (teste A/B: páginas vs formulário nativo). */
@@ -117,15 +119,19 @@ export interface SealResumo {
   reserva: SealSituacao
 }
 
-/** Linha da tabela de compradores SEAL (nome, email, UTMs). */
+/** Linha da tabela de compradores SEAL (detalhada). */
 export interface SealComprador {
   email: string
   nome: string | null
   situacao: string
+  data: string | null
+  hora: string | null
   utmSource: string | null
   utmCampaign: string | null
   utmMedium: string | null
   utmContent: string | null
+  utmTerm: string | null
+  utmPagina: string | null
 }
 
 /** Filtros globais do painel. */
@@ -135,6 +141,8 @@ export interface Filters {
   to: string
   /** Recorte por origem da captação: 'todas' | 'pagina' | 'nativo'. */
   origem: Origem
+  /** Grupo de WhatsApp da etapa: 'pre_venda' (Meteórico) | 'padrao' (Padrão). */
+  grupo: 'pre_venda' | 'padrao'
   campanha: string | null
   conjunto: string | null
   anuncio: string | null

@@ -22,6 +22,8 @@ interface OverlayMetric {
   text: string | null
 }
 
+export type FunnelVariant = 'meteorico' | 'padrao' | 'seal'
+
 /** Divisão protegida: sem denominador não há métrica (≠ métrica igual a zero). */
 const safe = (a: number, b: number) => (b > 0 ? a / b : null)
 const fmt = (v: number | null, f: (n: number) => string) => (v === null ? null : f(v))
@@ -31,8 +33,20 @@ const fmt = (v: number | null, f: (n: number) => string) => (v === null ? null :
  * largura do topo do degrau seguinte — cantos alinhados na vertical.
  * Sobre as bordas entre os degraus flutuam as métricas derivadas (CPM, CTR, …),
  * alternando esquerda/direita.
+ *
+ * As etapas já vêm reduzidas por etapa (Meteórico sem Checkouts; Padrão sem
+ * Leads). As métricas laterais se ancoram pelo NOME da etapa, então acompanham
+ * a lista recebida.
  */
-export function Funnel({ stages, cac }: { stages: FunnelStage[]; cac?: number }) {
+export function Funnel({
+  stages,
+  cac,
+  variant = 'meteorico',
+}: {
+  stages: FunnelStage[]
+  cac?: number
+  variant?: FunnelVariant
+}) {
   const n = stages.length
   // Larguras (em % do container) do topo de cada degrau; TOP_MIN = base do último.
   const TOP_MAX = 100
@@ -40,7 +54,7 @@ export function Funnel({ stages, cac }: { stages: FunnelStage[]; cac?: number })
   const widthAt = (index: number) =>
     TOP_MAX - (index / n) * (TOP_MAX - TOP_MIN)
 
-  const metrics = buildMetrics(stages, cac)
+  const metrics = buildMetrics(stages, cac, variant)
 
   return (
     <div className="flex w-full flex-col items-center gap-1 px-7">
@@ -102,12 +116,15 @@ export function Funnel({ stages, cac }: { stages: FunnelStage[]; cac?: number })
 }
 
 /**
- * Todos os insumos vêm do próprio funil (fn_funil); só o CAC é reaproveitado
- * de fn_kpis para não recalcular a mesma conta em dois lugares.
+ * Métricas laterais, ancoradas pelo NOME da etapa (boundary = índice dela na
+ * lista recebida). Assim funciona em qualquer variante:
+ *  - Meteórico: … Page Views → Leads (CPL) → Vendas (CAC).
+ *  - Padrão:    … Page Views → Checkouts (Conversão Checkout) → Vendas (CAC).
+ * CPC e Connect Rate foram removidos (não fazem parte destas visões).
  */
-function buildMetrics(stages: FunnelStage[], cac?: number): OverlayMetric[] {
-  const at = (label: string) =>
-    Number(stages.find((s) => s.label === label)?.value ?? 0)
+function buildMetrics(stages: FunnelStage[], cac: number | undefined, variant: FunnelVariant): OverlayMetric[] {
+  const at = (label: string) => Number(stages.find((s) => s.label === label)?.value ?? 0)
+  const idx = (label: string) => stages.findIndex((s) => s.label === label)
 
   const investimento = at('Investimento')
   const alcance = at('Alcance')
@@ -115,27 +132,32 @@ function buildMetrics(stages: FunnelStage[], cac?: number): OverlayMetric[] {
   const cliques = at('Cliques')
   const pageViews = at('Page Views')
   const leads = at('Leads')
+  const checkouts = at('Checkouts')
+  const vendas = at('Vendas')
 
   const pctOf = (v: number | null) => (v === null ? null : v * 100)
 
-  // Boundaries seguem os índices das etapas (Leads entrou entre Page Views e
-  // Checkouts): 0 Invest · 1 Alcance · 2 Impr · 3 Cliques · 4 PageViews · 5 Leads
-  // · 6 Checkouts · 7 Vendas. Cada caixa ancora na borda inferior do índice.
-  return [
-    // Alcance → Impressões
-    { label: 'Frequência', boundary: 1, side: 'right', text: fmt(safe(impressoes, alcance), formatDec1) },
-    // Impressões → Cliques
-    { label: 'CPM', boundary: 2, side: 'left', text: fmt(safe(investimento * 1000, impressoes), formatBRL) },
-    { label: 'CTR', boundary: 2, side: 'right', text: fmt(pctOf(safe(cliques, impressoes)), formatPct2) },
-    // Cliques → Page Views
-    { label: 'CPC', boundary: 3, side: 'left', text: fmt(safe(investimento, cliques), formatBRL) },
-    { label: 'Connect Rate', boundary: 3, side: 'right', text: fmt(pctOf(safe(pageViews, cliques)), formatPct2) },
-    // Page Views → Leads
-    { label: 'CPLV', boundary: 4, side: 'left', text: fmt(safe(investimento, pageViews), formatBRL) },
-    { label: 'Conversão Página', boundary: 4, side: 'right', text: fmt(pctOf(safe(leads, pageViews)), formatPct2) },
-    // Leads → Checkouts
-    { label: 'CPL', boundary: 5, side: 'left', text: fmt(safe(investimento, leads), formatBRL) },
-    // Checkouts → Vendas
-    { label: 'CAC', boundary: 6, side: 'left', text: cac && cac > 0 ? formatBRL(cac) : null },
-  ]
+  const out: OverlayMetric[] = []
+  const push = (label: string, anchor: string, side: 'left' | 'right', text: string | null) => {
+    const b = idx(anchor)
+    if (b >= 0) out.push({ label, boundary: b, side, text })
+  }
+
+  push('Frequência', 'Alcance', 'right', fmt(safe(impressoes, alcance), formatDec1))
+  push('CPM', 'Impressões', 'left', fmt(safe(investimento * 1000, impressoes), formatBRL))
+  push('CTR', 'Impressões', 'right', fmt(pctOf(safe(cliques, impressoes)), formatPct2))
+  push('CPLV', 'Page Views', 'left', fmt(safe(investimento, pageViews), formatBRL))
+  // Conversão Página: Meteórico = leads ÷ page views; Padrão = vendas ÷ page views.
+  const convNum = variant === 'padrao' ? vendas : leads
+  push('Conversão Página', 'Page Views', 'right', fmt(pctOf(safe(convNum, pageViews)), formatPct2))
+
+  if (variant === 'padrao') {
+    push('Conversão Checkout', 'Checkouts', 'left', fmt(pctOf(safe(vendas, checkouts)), formatPct2))
+    push('CAC', 'Checkouts', 'right', cac && cac > 0 ? formatBRL(cac) : null)
+  } else {
+    push('CPL', 'Leads', 'left', fmt(safe(investimento, leads), formatBRL))
+    push('CAC', 'Leads', 'right', cac && cac > 0 ? formatBRL(cac) : null)
+  }
+
+  return out
 }

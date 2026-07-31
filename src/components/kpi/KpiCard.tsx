@@ -42,7 +42,7 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
           </span>
         </div>
         <p className="mt-2 text-3xl font-bold tracking-tight text-muted/50">—</p>
-        <p className="mt-1 text-[11px] text-muted/70">sem recorte por origem</p>
+        <p className="mt-1 text-[11px] text-muted/70">{kpi.naNote ?? 'sem recorte por origem'}</p>
       </Panel>
     )
   }

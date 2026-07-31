@@ -11,6 +11,12 @@ interface HeaderProps {
   onPreset?: (p: Preset) => void
   userEmail?: string
   onLogout?: () => void
+  /** Sobretítulo (ex.: "Dashboard Meteórico"). */
+  overline?: string
+  /** Mostrar o dropdown de tag (na sidebar-first, fica oculto). */
+  showTagFilter?: boolean
+  /** Mostrar os checks de origem (só na etapa Meteórico). */
+  showOrigem?: boolean
 }
 
 export function Header({
@@ -22,6 +28,9 @@ export function Header({
   onPreset,
   userEmail,
   onLogout,
+  overline = 'Dashboard',
+  showTagFilter = true,
+  showOrigem = true,
 }: HeaderProps) {
   // Recorte de origem via dois checks. 'todas' = os dois marcados.
   const paginaOn = filters.origem === 'todas' || filters.origem === 'pagina'
@@ -42,7 +51,7 @@ export function Header({
         <img src="/logo.png" alt="" className="h-12 w-auto shrink-0" />
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-muted">
-            Dashboard
+            {overline}
           </p>
           <h1 className="truncate font-sans text-2xl font-bold text-[#c9b7a0]">
             Workshop Estrategista Patrimonial
@@ -66,7 +75,8 @@ export function Header({
           </button>
         )}
 
-        {/* Filtro de Tag */}
+        {/* Filtro de Tag (oculto na navegação por sidebar) */}
+        {showTagFilter && (
         <label className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-3.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
             Filtro
@@ -89,8 +99,10 @@ export function Header({
             ))}
           </select>
         </label>
+        )}
 
         {/* Filtro de Origem (recorte da captação: páginas vs formulário nativo) */}
+        {showOrigem && (
         <div className="flex h-10 items-center gap-1 rounded-xl border border-line bg-card px-2">
           <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
             Origem
@@ -123,6 +135,7 @@ export function Header({
             </button>
           ))}
         </div>
+        )}
 
         {/* Atalhos de período: 30D / 7D / 1D (toggle) */}
         {onPreset && (

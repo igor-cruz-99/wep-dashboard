@@ -88,7 +88,8 @@ interface KpiRow {
   base_qualificacao: number
 }
 interface FunilRow { etapa: string; valor: number; ordem: number }
-interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number; page_views: number }
+interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number; page_views: number; pesquisa: number }
+interface SerieGrupoRow { data: string; entradas: number }
 interface TrafegoRow {
   nivel: TrafficRow['nivel']
   campanha: string | null
@@ -109,10 +110,14 @@ interface SealCompradorRow {
   email: string
   nome: string | null
   situacao: string
+  data: string | null
+  hora: string | null
   utm_source: string | null
   utm_campaign: string | null
   utm_medium: string | null
   utm_content: string | null
+  utm_term: string | null
+  utm_pagina: string | null
 }
 
 // ── KPIs ──────────────────────────────────────────────────────────────────
@@ -121,10 +126,12 @@ export interface KpisResult {
   /** Nº de respostas de pesquisa e de leads no filtro (para o resumo do bloco Pesquisa). */
   respostasPesquisa: number
   leads: number
+  /** Entradas no grupo (bruto) — pra o card de Entrada Grupo do Padrão (÷ vendas). */
+  entradasGrupo: number
 }
 
 export async function fetchKpis(filters: Filters): Promise<KpisResult> {
-  const data = await callApi<KpiRow[]>('fn_kpis', rpcParamsO(filters))
+  const data = await callApi<KpiRow[]>('fn_kpis', { ...rpcParamsO(filters), p_grupo: filters.grupo })
   const r = (data?.[0] ?? {}) as Partial<KpiRow>
   const num = (v: number | undefined) => Number(v ?? 0)
 
@@ -149,7 +156,7 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
     { id: 'grupo', label: 'Entrada Grupo', value: grupoPct, meta: num(r.meta_grupo), format: 'pct', direction: 'normal' },
     { id: 'qualificacao', label: 'Qualificação', value: qualifPct, meta: num(r.meta_qualificacao), format: 'pct', direction: 'normal' },
   ]
-  return { cards, respostasPesquisa: num(r.pesquisas), leads: num(r.leads) }
+  return { cards, respostasPesquisa: num(r.pesquisas), leads: num(r.leads), entradasGrupo: num(r.entradas_grupo) }
 }
 
 // ── Funil ───────────────────────────────────────────────────────────────────
@@ -170,6 +177,7 @@ export async function fetchSeries(filters: Filters): Promise<{
   conversaoLeadsPorDia: DailyPoint[]
   investimentoPorDia: DailyPoint[]
   conversaoPorDia: DailyPoint[]
+  pesquisaPorDia: DailyPoint[]
 }> {
   const rows = (await callApi<SerieRow[]>('fn_serie_diaria', rpcParamsO(filters))) ?? []
   const pick = (key: keyof SerieRow): DailyPoint[] =>
@@ -187,7 +195,24 @@ export async function fetchSeries(filters: Filters): Promise<{
     }),
     investimentoPorDia: pick('investimento'),
     conversaoPorDia: pick('conversao'),
+    pesquisaPorDia: pick('pesquisa'),
   }
+}
+
+// ── Entrada no grupo por dia (por grupo da etapa) ───────────────────────────
+export async function fetchSerieGrupo(filters: Filters): Promise<DailyPoint[]> {
+  let rows: SerieGrupoRow[]
+  try {
+    rows = (await callApi<SerieGrupoRow[]>('fn_serie_grupo', {
+      p_from: filters.from || null,
+      p_to: filters.to || null,
+      p_grupo: filters.grupo,
+    })) ?? []
+  } catch (err) {
+    console.warn('fn_serie_grupo indisponível:', (err as Error)?.message)
+    return []
+  }
+  return rows.map((r) => ({ date: r.data, value: Number(r.entradas ?? 0) }))
 }
 
 // ── Análise de tráfego ──────────────────────────────────────────────────────
@@ -355,10 +380,14 @@ export async function fetchSealCompradores(filters: Filters): Promise<SealCompra
     email: r.email,
     nome: r.nome,
     situacao: r.situacao,
+    data: r.data,
+    hora: r.hora,
     utmSource: r.utm_source,
     utmCampaign: r.utm_campaign,
     utmMedium: r.utm_medium,
     utmContent: r.utm_content,
+    utmTerm: r.utm_term,
+    utmPagina: r.utm_pagina,
   }))
 }
 

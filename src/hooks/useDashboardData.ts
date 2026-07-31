@@ -10,6 +10,7 @@ import {
   fetchSealCompradores,
   fetchSealResumo,
   fetchSeries,
+  fetchSerieGrupo,
   fetchTraffic,
 } from '../lib/queries'
 import type {
@@ -37,7 +38,10 @@ export interface DashboardData {
     conversaoLeadsPorDia: DailyPoint[]
     investimentoPorDia: DailyPoint[]
     conversaoPorDia: DailyPoint[]
+    pesquisaPorDia: DailyPoint[]
   }
+  /** Entrada no grupo por dia (grupo da etapa atual). */
+  grupoPorDia: DailyPoint[]
   traffic: TrafficRow[]
   pages: PageRow[]
   origemLeads: OrigemLeadRow[]
@@ -46,6 +50,8 @@ export interface DashboardData {
   perfil: PesquisaPerfil
   /** Resumo do bloco Pesquisa: nº de respostas e % sobre os leads. */
   pesquisaResumo: { respostas: number; leads: number }
+  /** Entradas no grupo (bruto) — pro card de Entrada Grupo do Padrão. */
+  entradasGrupo: number
   seal: SealResumo
   sealCompradores: SealComprador[]
 }
@@ -85,14 +91,16 @@ export function useDashboardData(filters: Filters): State {
       fetchPesquisaPerfil(filters),
       fetchSealResumo(filters),
       fetchSealCompradores(filters),
+      fetchSerieGrupo(filters),
     ])
-      .then(([kpiRes, funnel, series, traffic, pages, origemLeads, cplOrigem, trafegoOrganico, perfil, seal, sealCompradores]) => {
+      .then(([kpiRes, funnel, series, traffic, pages, origemLeads, cplOrigem, trafegoOrganico, perfil, seal, sealCompradores, grupoPorDia]) => {
         if (cancelled) return
         setState({
           data: {
             kpis: kpiRes.cards,
             funnel,
             series,
+            grupoPorDia,
             traffic,
             pages,
             origemLeads,
@@ -100,6 +108,7 @@ export function useDashboardData(filters: Filters): State {
             trafegoOrganico,
             perfil,
             pesquisaResumo: { respostas: kpiRes.respostasPesquisa, leads: kpiRes.leads },
+            entradasGrupo: kpiRes.entradasGrupo,
             seal,
             sealCompradores,
           },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Header, type Preset } from '../components/layout/Header'
+import { Sidebar, type View } from '../components/layout/Sidebar'
 import { KpiCard } from '../components/kpi/KpiCard'
 import { ChartCard } from '../components/charts/ChartCard'
 import { Funnel } from '../components/funnel/Funnel'
@@ -10,12 +11,12 @@ import { CplOrigemCard } from '../components/kpi/CplOrigemCard'
 import { TrafegoOrganicoPie } from '../components/charts/TrafegoOrganicoPie'
 import { PesquisaCharts } from '../components/pesquisa/PesquisaCharts'
 import { SealCards } from '../components/seal/SealCards'
-import { SealBuyersTable } from '../components/seal/SealBuyersTable'
+import { SealDetailTable } from '../components/seal/SealDetailTable'
 import { Panel, SectionTitle } from '../components/ui/Panel'
 import { fetchTags } from '../lib/queries'
 import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
-import type { Filters } from '../types'
+import type { Filters, Kpi, PageRow, SealResumo } from '../types'
 
 // Cores das séries. Barras em caramelo; linhas dos combos em cores distintas
 // para dar contraste (e casar com as bolinhas ao lado do título).
@@ -29,19 +30,69 @@ const SERIES = {
 }
 
 /**
- * Placeholder para gráficos sem dimensão de origem (Vendas|CAC, Conversão
- * Checkout) quando há recorte parcial — mostra "—" em vez de repetir o total.
+ * Cards do topo por etapa.
+ *  - Meteórico: os 7 atuais (Investimento, Leads, CPL, Vendas, CAC, Grupo, Qualif.).
+ *  - Padrão: Investimento, Vendas, CAC, Entrada Grupo (grupo padrão ainda não
+ *    criado → "—"), Qualificação, Conversão Página (vendas ÷ page views das
+ *    páginas de venda — calculado no front, sem tocar no banco).
  */
-function NaChart({ title }: { title: string }) {
-  return (
-    <Panel className="flex min-h-[224px] flex-1 flex-col p-4">
-      <p className="text-sm font-semibold text-cream">{title}</p>
-      <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
-        <p className="text-3xl font-bold text-muted/40">—</p>
-        <p className="text-[11px] text-muted/70">sem recorte por origem</p>
-      </div>
-    </Panel>
-  )
+function kpisForView(view: View, kpis: Kpi[], pages: PageRow[], seal: SealResumo, entradasGrupo: number): Kpi[] {
+  const by = (id: string) => kpis.find((k) => k.id === id)
+  if (view === 'seal') {
+    // Cards do SEAL: Vendas Ingresso, Conversão SEAL (vendas SEAL ÷ ingressos),
+    // Investimento, CAC SEAL (investimento ÷ vendas SEAL).
+    const vendasIngresso = Number(by('vendas')?.value ?? 0)
+    const investimento = Number(by('investimento')?.value ?? 0)
+    const vendasSeal = seal.quitou.alunos + seal.reserva.alunos
+    return [
+      { id: 'vendasIngresso', label: 'Vendas Ingresso', value: vendasIngresso, format: 'int', direction: 'normal' },
+      {
+        id: 'conversaoSeal',
+        label: 'Conversão SEAL',
+        value: vendasIngresso > 0 ? (vendasSeal / vendasIngresso) * 100 : 0,
+        format: 'pct',
+        direction: 'normal',
+      },
+      { id: 'investimentoSeal', label: 'Investimento', value: investimento, format: 'brl', direction: 'inverse' },
+      {
+        id: 'cacSeal',
+        label: 'CAC SEAL',
+        value: vendasSeal > 0 ? investimento / vendasSeal : 0,
+        format: 'brl',
+        direction: 'inverse',
+        na: vendasSeal === 0,
+        naNote: 'sem vendas SEAL',
+      },
+    ]
+  }
+  if (view === 'padrao') {
+    const vend = pages.filter((p) => /vend/i.test(p.pagina))
+    const pv = vend.reduce((s, p) => s + p.pageView, 0)
+    const vd = vend.reduce((s, p) => s + p.vendas, 0)
+    const conversaoPagina: Kpi = {
+      id: 'conversaoPagina',
+      label: 'Conversão Página',
+      value: pv > 0 ? (vd / pv) * 100 : 0,
+      format: 'pct',
+      direction: 'normal',
+    }
+    // Entrada Grupo do Padrão = entradas no grupo padrão ÷ vendas (ingresso).
+    const vendasIng = Number(by('vendas')?.value ?? 0)
+    const grupoPadrao: Kpi = {
+      id: 'grupo',
+      label: 'Entrada Grupo',
+      value: vendasIng > 0 ? (entradasGrupo / vendasIng) * 100 : 0,
+      format: 'pct',
+      direction: 'normal',
+      na: vendasIng === 0,
+      naNote: 'sem vendas no período',
+    }
+    return [by('investimento'), by('vendas'), by('cac'), grupoPadrao, by('qualificacao'), conversaoPagina].filter(
+      Boolean,
+    ) as Kpi[]
+  }
+  // Meteórico (e SEAL por enquanto): conjunto atual completo.
+  return kpis
 }
 
 /**
@@ -66,17 +117,37 @@ interface DashboardProps {
   onLogout?: () => void
 }
 
-// Período padrão ao abrir o painel: janela do evento de captação atual.
-// Ajustar aqui quando houver um novo lançamento.
-const PERIODO_PADRAO = { from: '2026-07-23', to: '2026-08-02' }
+// Config de cada etapa (visão da sidebar): título, se mostra o recorte de
+// origem e a janela de datas padrão. É a DATA que separa Meteórico de Padrão.
+// Tags que aparecem como sub-itens na sidebar. Por ora só o lançamento ativo.
+// ⚠️ AO INSERIR novos lançamentos, mantenha esta lista em ORDEM CRONOLÓGICA
+//    (ex.: ['WEPAGO26', 'WEPOUT26', 'WEPDEZ26', ...]) — é a ordem em que aparecem.
+const SIDEBAR_TAGS = ['WEPAGO26']
+
+// Janela de datas por lançamento para o SEAL. Como vendas_pagarme não tem tag,
+// o "filtro de tag" do SEAL é um ATALHO DE PERÍODO: cada lançamento aponta pra
+// uma janela que vai até DEPOIS do evento (onde o SEAL é vendido).
+// ⚠️ Adicionar novos lançamentos aqui (mesma ordem cronológica da SIDEBAR_TAGS).
+const SEAL_TAG_WINDOWS: Record<string, { from: string; to: string }> = {
+  WEPAGO26: { from: '2026-07-23', to: '2026-08-31' },
+}
+
+const VIEWS: Record<View, { overline: string; showOrigem: boolean; from: string; to: string }> = {
+  meteorico: { overline: 'Dashboard Meteórico', showOrigem: true, from: '2026-07-23', to: '2026-07-30' },
+  padrao: { overline: 'Dashboard Padrão', showOrigem: false, from: '2026-07-31', to: '2026-08-21' },
+  seal: { overline: 'Dashboard SEAL', showOrigem: false, from: '2026-07-23', to: '2026-08-31' },
+}
 
 export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const [tags, setTags] = useState<TagWindow[]>([])
+  const [view, setView] = useState<View>('meteorico')
+  const [collapsed, setCollapsed] = useState(false)
   const [filters, setFilters] = useState<Filters>({
     tag: 'Todas',
-    from: PERIODO_PADRAO.from,
-    to: PERIODO_PADRAO.to,
+    from: VIEWS.meteorico.from,
+    to: VIEWS.meteorico.to,
     origem: 'todas',
+    grupo: 'pre_venda',
     campanha: null,
     conjunto: null,
     anuncio: null,
@@ -98,12 +169,61 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
     setFilters((f) => {
       const next = { ...f, ...p }
       if (p.tag !== undefined) {
-        const w = windowForTag(p.tag, tags)
-        if (w.from) next.from = w.from
-        if (w.to) next.to = w.to
+        if (view === 'seal') {
+          // No SEAL a tag é um atalho de período (lançamento), não a janela de captação.
+          const w = SEAL_TAG_WINDOWS[p.tag ?? '']
+          if (w) {
+            next.from = w.from
+            next.to = w.to
+          }
+        } else {
+          const w = windowForTag(p.tag, tags)
+          if (w.from) next.from = w.from
+          if (w.to) next.to = w.to
+        }
       }
       return next
     })
+  }
+
+  /** Troca de etapa pela sidebar: ajusta título, origem e a janela de datas. */
+  // Grupo de WhatsApp por etapa (Padrão usa o grupo padrão; resto o pré-venda).
+  const grupoForView = (v: View): Filters['grupo'] => (v === 'padrao' ? 'padrao' : 'pre_venda')
+
+  const selectView = (v: View) => {
+    exitPreset()
+    setView(v)
+    const grupo = grupoForView(v)
+    if (v === 'seal') {
+      // SEAL: a tag é atalho de período (lançamento). Entra no lançamento ativo.
+      const tag = SIDEBAR_TAGS[0]
+      const w = SEAL_TAG_WINDOWS[tag] ?? { from: VIEWS.seal.from, to: VIEWS.seal.to }
+      setFilters((f) => ({ ...f, tag, from: w.from, to: w.to, origem: 'todas', grupo }))
+      return
+    }
+    const cfg = VIEWS[v]
+    setFilters((f) => ({
+      ...f,
+      tag: 'Todas',
+      from: cfg.from,
+      to: cfg.to,
+      origem: cfg.showOrigem ? f.origem : 'todas',
+      grupo,
+    }))
+  }
+  /** Clique numa tag (sub-item da sidebar): entra na etapa e filtra a tag. */
+  const selectTag = (v: View, tag: string) => {
+    exitPreset()
+    setView(v)
+    const cfg = VIEWS[v]
+    setFilters((f) => ({
+      ...f,
+      tag,
+      from: cfg.from,
+      to: cfg.to,
+      origem: cfg.showOrigem ? f.origem : 'todas',
+      grupo: grupoForView(v),
+    }))
   }
 
   // Data local no formato YYYY-MM-DD (sem shift de fuso).
@@ -126,6 +246,27 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   }
 
   const { data, loading, error } = useDashboardData(filters)
+
+  // Cards do topo variam por etapa (Meteórico 7, Padrão 6, SEAL 4).
+  const cards = data ? kpisForView(view, data.kpis, data.pages, data.seal, data.entradasGrupo) : []
+  const kpiCols =
+    cards.length >= 7 ? 'lg:grid-cols-7' : cards.length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-6'
+
+  // Funil por etapa:
+  //  - Meteórico: tira Checkouts (Leads→Vendas).
+  //  - Padrão: tira Leads (Page Views→Checkouts→Vendas) e o Page Views passa a ser
+  //    só das páginas de VENDA (vend) — calculado no front sobre data.pages.
+  const vendPageViews = data ? data.pages.filter((p) => /vend/i.test(p.pagina)).reduce((a, p) => a + p.pageView, 0) : 0
+  const funnelStages = !data
+    ? []
+    : view === 'padrao'
+      ? data.funnel
+          .filter((s) => s.label !== 'Leads')
+          .map((s) => (s.label === 'Page Views' ? { ...s, value: vendPageViews } : s))
+      : view === 'meteorico'
+        ? data.funnel.filter((s) => s.label !== 'Checkouts')
+        : data.funnel
+  const cacValue = data?.kpis.find((k) => k.id === 'cac')?.value
 
   // Carrega as tags para o seletor. O período inicial fica no PERIODO_PADRAO
   // (evento atual) e NÃO é sobrescrito pela janela da tag ao abrir — só muda
@@ -151,7 +292,18 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] px-6 py-6">
+    <div className="flex min-h-screen">
+      <Sidebar
+        view={view}
+        activeTag={filters.tag && filters.tag !== 'Todas' ? filters.tag : null}
+        tags={SIDEBAR_TAGS.filter((t) => tags.some((x) => x.tag === t))}
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((c) => !c)}
+        onSelectView={selectView}
+        onSelectTag={selectTag}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="mx-auto max-w-[1600px] px-6 py-6">
       {/* Status da fonte de dados */}
       <div className="mb-4 flex items-center gap-3 text-xs text-muted">
         <span
@@ -178,13 +330,16 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
 
       <Header
         filters={filters}
-        tags={tagNames}
+        tags={view === 'seal' ? SIDEBAR_TAGS : tagNames}
         onChange={handleChange}
-        onClearFilters={() => handleChange({ tag: 'Todas', origem: 'todas' })}
+        onClearFilters={view === 'seal' ? undefined : () => handleChange({ tag: 'Todas', origem: 'todas' })}
         activePreset={activePreset}
         onPreset={applyPreset}
         userEmail={userEmail}
         onLogout={onLogout}
+        overline={VIEWS[view].overline}
+        showTagFilter={view === 'seal'}
+        showOrigem={VIEWS[view].showOrigem}
       />
 
       {/* Estados sem dados: erro ou carregando (sem dados fictícios) */}
@@ -204,19 +359,19 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
         </div>
       ) : (
         <>
-          {/* KPIs */}
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
-            {data.kpis.map((k) => (
+          {/* KPIs (variam por etapa) */}
+          <div className={`mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 ${kpiCols}`}>
+            {cards.map((k) => (
               <KpiCard key={k.id} kpi={k} />
             ))}
           </div>
 
-          {/* Gráficos + funil */}
+          {/* Gráficos + funil (Meteórico/Padrão; SEAL não tem) */}
+          {view !== 'seal' && (
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr_1fr]">
+            {/* Coluna esquerda: sup = Leads|Conversão (Met) ou Vendas|CAC (Pad); inf = Entrada grupo/dia */}
             <div className="flex flex-col gap-4">
-              {filters.origem !== 'todas' ? (
-                <NaChart title="Vendas por dia | CAC" />
-              ) : (
+              {view === 'padrao' ? (
                 <ChartCard
                   title="Vendas por dia | CAC"
                   data={data.series.vendasPorDia}
@@ -226,26 +381,34 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                   line={{ data: data.series.cacPorDia, color: SERIES.cac, label: 'CAC', format: 'brl' }}
                   onSelectDay={selectDay}
                 />
+              ) : (
+                <ChartCard
+                  title="Leads por dia | Conversão"
+                  data={data.series.leadsPorDia}
+                  kind="bar"
+                  color={SERIES.leads}
+                  seriesLabel="Leads"
+                  line={{ data: data.series.conversaoLeadsPorDia, color: SERIES.conversaoLeads, label: 'Conversão', format: 'pct' }}
+                  onSelectDay={selectDay}
+                />
               )}
               <ChartCard
-                title="Leads por dia | Conversão"
-                data={data.series.leadsPorDia}
+                title="Entrada no grupo por dia"
+                data={data.grupoPorDia}
                 kind="bar"
                 color={SERIES.leads}
-                seriesLabel="Leads"
-                line={{ data: data.series.conversaoLeadsPorDia, color: SERIES.conversaoLeads, label: 'Conversão', format: 'pct' }}
+                seriesLabel="Entradas"
                 onSelectDay={selectDay}
               />
             </div>
 
+            {/* Funil (etapas e métricas mudam por etapa) */}
             <Panel className="p-5">
               <SectionTitle title="Funil de conversão" titleClassName="text-muted uppercase font-semibold" className="mb-5 text-center" />
-              <Funnel
-                stages={data.funnel}
-                cac={data.kpis.find((k) => k.id === 'cac')?.value}
-              />
+              <Funnel stages={funnelStages} cac={cacValue} variant={view} />
             </Panel>
 
+            {/* Coluna direita: sup = Investimento/dia; inf = Respostas pesquisa/dia (Met) ou Conversão Checkout/dia (Pad) */}
             <div className="flex flex-col gap-4">
               <ChartCard
                 title="Investimento por dia"
@@ -255,9 +418,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                 headlineFormat="brl"
                 onSelectDay={selectDay}
               />
-              {filters.origem !== 'todas' ? (
-                <NaChart title="Conversão Checkout por dia" />
-              ) : (
+              {view === 'padrao' ? (
                 <ChartCard
                   title="Conversão Checkout por dia"
                   data={data.series.conversaoPorDia}
@@ -265,50 +426,78 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                   color={SERIES.conversao}
                   onSelectDay={selectDay}
                 />
+              ) : (
+                <ChartCard
+                  title="Respostas pesquisa por dia"
+                  data={data.series.pesquisaPorDia}
+                  kind="bar"
+                  color={SERIES.leads}
+                  seriesLabel="Respostas"
+                  onSelectDay={selectDay}
+                />
               )}
             </div>
           </div>
+          )}
 
-          {/* Origem dos Leads | CPL por origem | Tráfego x Orgânico */}
-          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <OrigemLeadsTable rows={data.origemLeads} />
-            <CplOrigemCard data={data.cplOrigem} />
-            <TrafegoOrganicoPie data={data.trafegoOrganico} />
-          </div>
-
-          {/* Tabelas + Pesquisa + SEAL */}
-          <div className="mt-6 flex flex-col gap-6">
-            <TrafficTable rows={data.traffic} />
-            <PagesTable
-              rows={data.pages.filter((p) => /cap|forms/i.test(p.pagina))}
-              title="Desempenho página de captação"
-              colKeys={['pagina', 'pageView', 'leads', 'pesquisa']}
-            />
-            <PagesTable
-              rows={data.pages.filter((p) => /vend/i.test(p.pagina))}
-              title="Desempenho página de vendas"
-              colKeys={['pagina', 'pageView', 'checkout', 'vendas', 'checkoutVenda', 'visitaCheckout', 'visitaVenda']}
-            />
-            <PesquisaCharts
-              perfil={data.perfil}
-              respostas={data.pesquisaResumo.respostas}
-              leads={data.pesquisaResumo.leads}
-            />
-
-            {/* SEAL — situação de pagamento + compradores */}
-            <div className="flex flex-col gap-4">
-              <SectionTitle overline="SEAL" title="Situação de pagamento" />
-              <SealCards
-                seal={data.seal}
-                investimento={
-                  data.funnel.find((s) => s.label === 'Investimento')?.value ?? 0
-                }
-              />
-              <SealBuyersTable rows={data.sealCompradores} />
+          {/* Origem dos Leads | CPL | Tráfego x Orgânico — só Meteórico */}
+          {view === 'meteorico' && (
+            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <OrigemLeadsTable rows={data.origemLeads} />
+              <CplOrigemCard data={data.cplOrigem} />
+              <TrafegoOrganicoPie data={data.trafegoOrganico} />
             </div>
-          </div>
+          )}
+
+          {/* Análise + Pesquisa (Meteórico/Padrão) — SEAL tem seu próprio corpo */}
+          {view !== 'seal' && (
+            <div className="mt-6 flex flex-col gap-6">
+              {/* Tráfego por campanha: nas duas etapas */}
+              <TrafficTable rows={data.traffic} />
+
+              {/* Página de captação (Meteórico) / de vendas (Padrão) */}
+              {view === 'meteorico' ? (
+                <PagesTable
+                  rows={data.pages.filter((p) => /cap|forms/i.test(p.pagina))}
+                  title="Desempenho página de captação"
+                  colKeys={['pagina', 'pageView', 'leads', 'pesquisa']}
+                />
+              ) : (
+                <PagesTable
+                  rows={data.pages.filter((p) => /vend/i.test(p.pagina))}
+                  title="Desempenho página de vendas"
+                  colKeys={['pagina', 'pageView', 'checkout', 'vendas', 'checkoutVenda', 'visitaCheckout', 'visitaVenda']}
+                />
+              )}
+
+              {/* Pesquisa: mesma pesquisa, título muda por etapa */}
+              <PesquisaCharts
+                perfil={data.perfil}
+                respostas={data.pesquisaResumo.respostas}
+                leads={data.pesquisaResumo.leads}
+                title={view === 'padrao' ? 'Respostas dos compradores' : 'Respostas da pesquisa'}
+              />
+            </div>
+          )}
+
+          {/* SEAL — só na aba SEAL. Situação de pagamento + compradores; a tabela
+              de indicadores nova entra aqui quando você mandar os campos. */}
+          {view === 'seal' && (
+            <div className="mt-6 flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
+                <SectionTitle overline="SEAL" title="Situação de pagamento" />
+                <SealCards
+                  seal={data.seal}
+                  investimento={data.funnel.find((s) => s.label === 'Investimento')?.value ?? 0}
+                />
+                <SealDetailTable rows={data.sealCompradores} tag={filters.tag} />
+              </div>
+            </div>
+          )}
         </>
       )}
+        </div>
+      </div>
     </div>
   )
 }

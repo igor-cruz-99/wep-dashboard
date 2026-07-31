@@ -25,6 +25,7 @@ const ALLOWED_RPC = new Set([
   'fn_kpis',
   'fn_funil',
   'fn_serie_diaria',
+  'fn_serie_grupo',
   'fn_trafego',
   'fn_paginas',
   'fn_pesquisa_perfil',

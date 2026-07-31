@@ -189,6 +189,8 @@ interface PesquisaChartsProps {
   /** Nº de respostas de pesquisa e de leads (para o resumo ao lado do título). */
   respostas: number
   leads: number
+  /** Título do bloco (muda por etapa: "Respostas da pesquisa" / "…dos compradores"). */
+  title?: string
 }
 
 /**
@@ -196,7 +198,7 @@ interface PesquisaChartsProps {
  * Renda e profissão em barras; idade em rosca; gênero em pizza.
  * Ao lado do título: nº de respostas e % sobre os leads (pesquisa ÷ leads).
  */
-export function PesquisaCharts({ perfil, respostas, leads }: PesquisaChartsProps) {
+export function PesquisaCharts({ perfil, respostas, leads, title = 'Respostas dos compradores' }: PesquisaChartsProps) {
   // % de quem virou lead e respondeu a pesquisa. Cor na escala 0–100 (igual aos KPIs).
   const pct = leads > 0 ? (respostas / leads) * 100 : 0
   const cor = metaColor(pct, 'normal')
@@ -206,7 +208,7 @@ export function PesquisaCharts({ perfil, respostas, leads }: PesquisaChartsProps
     <Panel className="p-5">
       {/* Resumo colado à direita do subtítulo (não na ponta do painel). */}
       <div className="mb-4 flex flex-wrap items-end gap-x-3 gap-y-1">
-        <SectionTitle overline="Pesquisa" title="Respostas dos compradores" />
+        <SectionTitle overline="Pesquisa" title={title} />
         <div className="flex items-baseline gap-2">
           <span className="text-xl font-bold text-cream">{formatInt(respostas)}</span>
           <span className="inline-flex items-center gap-1 text-sm font-bold" style={{ color: cor }}>
