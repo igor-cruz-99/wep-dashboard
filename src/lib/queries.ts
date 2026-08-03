@@ -102,6 +102,8 @@ interface KpiRow {
   meta_investimento: number
   meta_cpl: number
   base_qualificacao: number
+  landing_page_views: number
+  link_cliques: number
 }
 interface FunilRow { etapa: string; valor: number; ordem: number }
 interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number; page_views: number; pesquisa: number }
@@ -111,6 +113,7 @@ interface TrafegoRow {
   campanha: string | null
   conjunto: string | null
   anuncio: string | null
+  ad_id: string | null
   investimento: number
   vendas: number
   leads: number
@@ -144,6 +147,9 @@ export interface KpisResult {
   leads: number
   /** Entradas no grupo (bruto) — pra o card de Entrada Grupo do Padrão (÷ vendas). */
   entradasGrupo: number
+  /** Brutos pro Connect Rate do funil (landing_page_views ÷ link_cliques × 100). */
+  landingPageViews: number
+  linkCliques: number
 }
 
 export async function fetchKpis(filters: Filters): Promise<KpisResult> {
@@ -176,7 +182,14 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
     { id: 'grupo', label: 'Entrada Grupo', value: grupoPct, meta: num(r.meta_grupo), format: 'pct', direction: 'normal' },
     { id: 'qualificacao', label: 'Qualificação', value: qualifPct, meta: num(r.meta_qualificacao), format: 'pct', direction: 'normal' },
   ]
-  return { cards, respostasPesquisa: num(r.pesquisas), leads: num(r.leads), entradasGrupo: num(r.entradas_grupo) }
+  return {
+    cards,
+    respostasPesquisa: num(r.pesquisas),
+    leads: num(r.leads),
+    entradasGrupo: num(r.entradas_grupo),
+    landingPageViews: num(r.landing_page_views),
+    linkCliques: num(r.link_cliques),
+  }
 }
 
 // ── Funil ───────────────────────────────────────────────────────────────────
@@ -250,6 +263,7 @@ export async function fetchTraffic(filters: Filters): Promise<TrafficRow[]> {
     campanha: r.campanha,
     conjunto: r.conjunto,
     anuncio: r.anuncio,
+    adId: r.ad_id,
     investimento: Number(r.investimento),
     vendas: Number(r.vendas),
     leads: Number(r.leads ?? 0), // tolera fn_trafego antiga (sem leads) até rodar o 11_leads.sql
@@ -259,6 +273,33 @@ export async function fetchTraffic(filters: Filters): Promise<TrafficRow[]> {
     hold: Number(r.hold),
     body: Number(r.body),
   }))
+}
+
+// ── Thumbnail do anúncio (popup ao clicar na tabela) ────────────────────────
+interface AdThumbnailRow {
+  ad_id: string
+  ad_name: string | null
+  thumbnail_url: string | null
+  image_url: string | null
+}
+export interface AdThumbnail {
+  adId: string
+  adName: string | null
+  /** URL pra exibir no popup: image_url tem preferência, cai pra thumbnail_url. */
+  url: string | null
+}
+
+export async function fetchAdThumbnail(adId: string): Promise<AdThumbnail | null> {
+  let rows: AdThumbnailRow[]
+  try {
+    rows = (await callApi<AdThumbnailRow[]>('fn_ad_thumbnail', { p_ad_id: adId })) ?? []
+  } catch (err) {
+    console.warn('fn_ad_thumbnail indisponível:', (err as Error)?.message)
+    return null
+  }
+  const r = rows[0]
+  if (!r) return null
+  return { adId: r.ad_id, adName: r.ad_name, url: r.image_url ?? r.thumbnail_url }
 }
 
 // ── Páginas ─────────────────────────────────────────────────────────────────

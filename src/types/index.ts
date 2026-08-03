@@ -72,6 +72,8 @@ export interface TrafficRow {
   campanha: string | null
   conjunto: string | null
   anuncio: string | null
+  /** Id real do anúncio na Meta — usado pra buscar a thumbnail no popup. */
+  adId: string | null
   investimento: number
   vendas: number
   leads: number

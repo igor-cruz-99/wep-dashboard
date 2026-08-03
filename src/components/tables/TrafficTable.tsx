@@ -233,7 +233,14 @@ function MetricTable({
 const includes = (hay: string, needle: string) =>
   hay.toLowerCase().includes(needle.trim().toLowerCase())
 
-export function TrafficTable({ rows }: { rows: TrafficRow[] }) {
+export function TrafficTable({
+  rows,
+  onAdClick,
+}: {
+  rows: TrafficRow[]
+  /** Clique numa linha de anúncio (abre o popup de preview). */
+  onAdClick?: (row: TrafficRow) => void
+}) {
   const [selCampanha, setSelCampanha] = useState<string | null>(null)
   const [selConjunto, setSelConjunto] = useState<string | null>(null)
   const [qCamp, setQCamp] = useState('')
@@ -327,7 +334,8 @@ export function TrafficTable({ rows }: { rows: TrafficRow[] }) {
           firstCol="Anúncio"
           rows={anunciosView}
           keyOf={(r) => r.anuncio}
-          emptyHint={hasFilter ? 'Nenhum anúncio nesse filtro.' : 'Clique numa campanha/conjunto para focar, ou veja todos.'}
+          onRowClick={onAdClick}
+          emptyHint={hasFilter ? 'Nenhum anúncio nesse filtro.' : 'Clique num anúncio para ver o preview, numa campanha/conjunto para focar.'}
         />
       </div>
     </Panel>

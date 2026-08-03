@@ -42,10 +42,15 @@ export function Funnel({
   stages,
   cac,
   variant = 'meteorico',
+  landingPageViews,
+  linkCliques,
 }: {
   stages: FunnelStage[]
   cac?: number
   variant?: FunnelVariant
+  /** Connect Rate = landingPageViews ÷ linkCliques × 100 (métrica da Meta, não da GA4). */
+  landingPageViews?: number
+  linkCliques?: number
 }) {
   const n = stages.length
   // Larguras (em % do container) do topo de cada degrau; TOP_MIN = base do último.
@@ -54,7 +59,7 @@ export function Funnel({
   const widthAt = (index: number) =>
     TOP_MAX - (index / n) * (TOP_MAX - TOP_MIN)
 
-  const metrics = buildMetrics(stages, cac, variant)
+  const metrics = buildMetrics(stages, cac, variant, landingPageViews, linkCliques)
 
   return (
     <div className="flex w-full flex-col items-center gap-1 px-7">
@@ -120,9 +125,17 @@ export function Funnel({
  * lista recebida). Assim funciona em qualquer variante:
  *  - Meteórico: … Page Views → Leads (CPL) → Vendas (CAC).
  *  - Padrão:    … Page Views → Checkouts (Conversão Checkout) → Vendas (CAC).
- * CPC e Connect Rate foram removidos (não fazem parte destas visões).
+ * CPC foi removido (não faz parte destas visões). Connect Rate voltou — vem
+ * de landing_page_views/link_cliques da Meta (não das etapas Cliques/Page
+ * Views do funil, que misturam GA4), por isso entra como parâmetro à parte.
  */
-function buildMetrics(stages: FunnelStage[], cac: number | undefined, variant: FunnelVariant): OverlayMetric[] {
+function buildMetrics(
+  stages: FunnelStage[],
+  cac: number | undefined,
+  variant: FunnelVariant,
+  landingPageViews?: number,
+  linkCliques?: number
+): OverlayMetric[] {
   const at = (label: string) => Number(stages.find((s) => s.label === label)?.value ?? 0)
   const idx = (label: string) => stages.findIndex((s) => s.label === label)
 
@@ -146,6 +159,7 @@ function buildMetrics(stages: FunnelStage[], cac: number | undefined, variant: F
   push('Frequência', 'Alcance', 'right', fmt(safe(impressoes, alcance), formatDec1))
   push('CPM', 'Impressões', 'left', fmt(safe(investimento * 1000, impressoes), formatBRL))
   push('CTR', 'Impressões', 'right', fmt(pctOf(safe(cliques, impressoes)), formatPct2))
+  push('Connect Rate', 'Cliques', 'right', fmt(pctOf(safe(landingPageViews ?? 0, linkCliques ?? 0)), formatPct2))
   push('CPLV', 'Page Views', 'left', fmt(safe(investimento, pageViews), formatBRL))
   // Conversão Página: Meteórico = leads ÷ page views; Padrão = vendas ÷ page views.
   const convNum = variant === 'padrao' ? vendas : leads

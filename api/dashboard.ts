@@ -34,6 +34,7 @@ const ALLOWED_RPC = new Set([
   'fn_trafego_organico',
   'fn_seal_resumo',
   'fn_seal_compradores',
+  'fn_ad_thumbnail',
 ])
 
 interface Req {

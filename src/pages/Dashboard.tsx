@@ -66,7 +66,7 @@ function kpisForView(view: View, kpis: Kpi[], pages: PageRow[], seal: SealResumo
     ]
   }
   if (view === 'padrao') {
-    const vend = pages.filter((p) => /vend/i.test(p.pagina))
+    const vend = pages.filter((p) => /vend|-pv-/i.test(p.pagina))
     const pv = vend.reduce((s, p) => s + p.pageView, 0)
     const vd = vend.reduce((s, p) => s + p.vendas, 0)
     const conversaoPagina: Kpi = {
@@ -256,7 +256,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   //  - Meteórico: tira Checkouts (Leads→Vendas).
   //  - Padrão: tira Leads (Page Views→Checkouts→Vendas) e o Page Views passa a ser
   //    só das páginas de VENDA (vend) — calculado no front sobre data.pages.
-  const vendPageViews = data ? data.pages.filter((p) => /vend/i.test(p.pagina)).reduce((a, p) => a + p.pageView, 0) : 0
+  const vendPageViews = data ? data.pages.filter((p) => /vend|-pv-/i.test(p.pagina)).reduce((a, p) => a + p.pageView, 0) : 0
   const funnelStages = !data
     ? []
     : view === 'padrao'
@@ -405,7 +405,13 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
             {/* Funil (etapas e métricas mudam por etapa) */}
             <Panel className="p-5">
               <SectionTitle title="Funil de conversão" titleClassName="text-muted uppercase font-semibold" className="mb-5 text-center" />
-              <Funnel stages={funnelStages} cac={cacValue} variant={view} />
+              <Funnel
+                stages={funnelStages}
+                cac={cacValue}
+                variant={view}
+                landingPageViews={data.landingPageViews}
+                linkCliques={data.linkCliques}
+              />
             </Panel>
 
             {/* Coluna direita: sup = Investimento/dia; inf = Respostas pesquisa/dia (Met) ou Conversão Checkout/dia (Pad) */}
@@ -466,7 +472,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                 />
               ) : (
                 <PagesTable
-                  rows={data.pages.filter((p) => /vend/i.test(p.pagina))}
+                  rows={data.pages.filter((p) => /vend|-pv-/i.test(p.pagina))}
                   title="Desempenho página de vendas"
                   colKeys={['pagina', 'pageView', 'checkout', 'vendas', 'checkoutVenda', 'visitaCheckout', 'visitaVenda']}
                 />

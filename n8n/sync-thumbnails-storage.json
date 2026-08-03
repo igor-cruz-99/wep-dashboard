@@ -1,0 +1,258 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 20
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1824, 64],
+      "id": "b1f865bf-1739-448e-8042-2b2e343a8cc4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sfxbzfaxbbdjzuhzzrjc.supabase.co/rest/v1/rpc/fn_ads_pendentes_wep",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Profile", "value": "mkt_wep" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"p_limit\": 20 }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1600, 64],
+      "id": "306a5960-08d1-42e8-bce2-6a58055e5c13",
+      "name": "Buscar pendentes",
+      "credentials": {
+        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  if (Array.isArray(item.json)) {\n    for (const row of item.json) out.push({ json: row });\n  } else {\n    out.push({ json: item.json });\n  }\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1376, 64],
+      "id": "b9492ce9-e13e-4abd-a602-a5935a0f55f9",
+      "name": "Split pendentes"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v18.0/{{ $json.ad_id }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "fields", "value": "creative{image_url,thumbnail_url}" },
+            {
+              "name": "access_token",
+              "value": "EAAPJZCbYOcU8BQiOA58dKlFJElMmHmZABf3MAJHf5rQjhvUIi8hMyjbgjCkCgF5F4IRarRZB7gtt180fcp3scwbWzgF23H7o9u1wmCZB2yw4dS3VrUh0xhF3ZBAZAdPDncINUy1JLXwDtXqA5LFECUtLnUOgPyX21LvmwsZCJH8uwJLJoOvTtf4dc1ie0oDM2GN2XZA88tAZD"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-1168, 64],
+      "id": "b9bae4bc-291a-4ac2-b849-2460c8f85b05",
+      "name": "Resolver URL fresca",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.creative?.image_url || $json.creative?.thumbnail_url || $('Split pendentes').item.json.image_url || $('Split pendentes').item.json.thumbnail_url }}",
+        "options": {
+          "response": {
+            "response": { "responseFormat": "file" }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-944, 64],
+      "id": "229f44a7-7e3e-49df-a2f7-08e4819c1713",
+      "name": "Baixar imagem",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/ad-creatives/{{ $('Split pendentes').item.json.ad_id }}.jpg",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "image/jpeg" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-720, 64],
+      "id": "9d442af6-e6b3-4a27-b9ba-b54d11a80df2",
+      "name": "Upload imagem Storage",
+      "credentials": {
+        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 1 },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Split pendentes').item.json.video_id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-496, 64],
+      "id": "180e7327-ebd6-42f3-9967-910786a7178b",
+      "name": "Tem vídeo?"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v18.0/{{ $('Split pendentes').item.json.video_id }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "fields", "value": "source" },
+            {
+              "name": "access_token",
+              "value": "EAAPJZCbYOcU8BQiOA58dKlFJElMmHmZABf3MAJHf5rQjhvUIi8hMyjbgjCkCgF5F4IRarRZB7gtt180fcp3scwbWzgF23H7o9u1wmCZB2yw4dS3VrUh0xhF3ZBAZAdPDncINUy1JLXwDtXqA5LFECUtLnUOgPyX21LvmwsZCJH8uwJLJoOvTtf4dc1ie0oDM2GN2XZA88tAZD"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-272, -48],
+      "id": "a833f6ad-af02-48c7-98f3-59d41d0fec63",
+      "name": "Resolver source do vídeo",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.source }}",
+        "options": {
+          "response": {
+            "response": { "responseFormat": "file" }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-48, -48],
+      "id": "8087b344-1cd0-4401-add9-1f0813192e31",
+      "name": "Baixar vídeo",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/ad-creatives/{{ $('Split pendentes').item.json.ad_id }}.mp4",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "video/mp4" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [176, -48],
+      "id": "debad94a-a814-4350-822d-38c67c30f39d",
+      "name": "Upload vídeo Storage",
+      "credentials": {
+        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://sfxbzfaxbbdjzuhzzrjc.supabase.co/rest/v1/ads_thumbnails?ad_id=eq.{{ $('Split pendentes').item.json.ad_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Profile", "value": "core" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  storage_url: 'https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/public/ad-creatives/' + $('Split pendentes').item.json.ad_id + '.jpg',\n  storage_video_url: $('Split pendentes').item.json.video_id ? ('https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/public/ad-creatives/' + $('Split pendentes').item.json.ad_id + '.mp4') : null,\n  synced_at: $now.toISO()\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [400, 64],
+      "id": "152bb3a3-2ae5-4c22-9f16-22533a600192",
+      "name": "Atualizar registro",
+      "credentials": {
+        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "Buscar pendentes", "type": "main", "index": 0 }]] },
+    "Buscar pendentes": { "main": [[{ "node": "Split pendentes", "type": "main", "index": 0 }]] },
+    "Split pendentes": { "main": [[{ "node": "Resolver URL fresca", "type": "main", "index": 0 }]] },
+    "Resolver URL fresca": { "main": [[{ "node": "Baixar imagem", "type": "main", "index": 0 }]] },
+    "Baixar imagem": { "main": [[{ "node": "Upload imagem Storage", "type": "main", "index": 0 }]] },
+    "Upload imagem Storage": { "main": [[{ "node": "Tem vídeo?", "type": "main", "index": 0 }]] },
+    "Tem vídeo?": {
+      "main": [
+        [{ "node": "Resolver source do vídeo", "type": "main", "index": 0 }],
+        [{ "node": "Atualizar registro", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resolver source do vídeo": { "main": [[{ "node": "Baixar vídeo", "type": "main", "index": 0 }]] },
+    "Baixar vídeo": { "main": [[{ "node": "Upload vídeo Storage", "type": "main", "index": 0 }]] },
+    "Upload vídeo Storage": { "main": [[{ "node": "Atualizar registro", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "0fc18357c0c79b35ae76b7ece3b32c198e6f514910c6e5b37265a9d7b94cdceb"
+  }
+}
