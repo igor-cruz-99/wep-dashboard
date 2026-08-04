@@ -405,13 +405,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
             {/* Funil (etapas e métricas mudam por etapa) */}
             <Panel className="p-5">
               <SectionTitle title="Funil de conversão" titleClassName="text-muted uppercase font-semibold" className="mb-5 text-center" />
-              <Funnel
-                stages={funnelStages}
-                cac={cacValue}
-                variant={view}
-                landingPageViews={data.landingPageViews}
-                linkCliques={data.linkCliques}
-              />
+              <Funnel stages={funnelStages} cac={cacValue} variant={view} />
             </Panel>
 
             {/* Coluna direita: sup = Investimento/dia; inf = Respostas pesquisa/dia (Met) ou Conversão Checkout/dia (Pad) */}

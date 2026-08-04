@@ -52,9 +52,6 @@ export interface DashboardData {
   pesquisaResumo: { respostas: number; leads: number }
   /** Entradas no grupo (bruto) — pro card de Entrada Grupo do Padrão. */
   entradasGrupo: number
-  /** Brutos pro Connect Rate do funil. */
-  landingPageViews: number
-  linkCliques: number
   seal: SealResumo
   sealCompradores: SealComprador[]
 }
@@ -112,8 +109,6 @@ export function useDashboardData(filters: Filters): State {
             perfil,
             pesquisaResumo: { respostas: kpiRes.respostasPesquisa, leads: kpiRes.leads },
             entradasGrupo: kpiRes.entradasGrupo,
-            landingPageViews: kpiRes.landingPageViews,
-            linkCliques: kpiRes.linkCliques,
             seal,
             sealCompradores,
           },
