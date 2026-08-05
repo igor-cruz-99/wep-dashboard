@@ -163,6 +163,10 @@ function buildMetrics(
   push('CPM', 'Impressões', 'left', fmt(safe(investimento * 1000, impressoes), formatBRL))
   push('CTR', 'Impressões', 'right', fmt(pctOf(safe(cliques, impressoes)), formatPct2))
   push('Connect Rate', 'Cliques', 'right', fmt(pctOf(safe(landingPageViews ?? 0, linkCliques ?? 0)), formatPct2))
+  // CPC: só no Padrão (pedido específico dessa visão).
+  if (variant === 'padrao') {
+    push('CPC', 'Cliques', 'left', fmt(safe(investimento, cliques), formatBRL))
+  }
   push('CPLV', 'Page Views', 'left', fmt(safe(investimento, pageViews), formatBRL))
   // Conversão Página: Meteórico = leads ÷ page views; Padrão = vendas ÷ page views.
   const convNum = variant === 'padrao' ? vendas : leads
