@@ -102,6 +102,8 @@ interface KpiRow {
   meta_investimento: number
   meta_cpl: number
   base_qualificacao: number
+  landing_page_views: number
+  link_cliques: number
 }
 interface FunilRow { etapa: string; valor: number; ordem: number }
 interface SerieRow { data: string; vendas: number; investimento: number; cac: number; conversao: number; leads: number; page_views: number; pesquisa: number }
@@ -145,6 +147,9 @@ export interface KpisResult {
   leads: number
   /** Entradas no grupo (bruto) — pra o card de Entrada Grupo do Padrão (÷ vendas). */
   entradasGrupo: number
+  /** Brutos pro Connect Rate do funil (landing_page_views ÷ link_cliques × 100, métrica oficial da Meta). */
+  landingPageViews: number
+  linkCliques: number
 }
 
 export async function fetchKpis(filters: Filters): Promise<KpisResult> {
@@ -182,6 +187,8 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
     respostasPesquisa: num(r.pesquisas),
     leads: num(r.leads),
     entradasGrupo: num(r.entradas_grupo),
+    landingPageViews: num(r.landing_page_views),
+    linkCliques: num(r.link_cliques),
   }
 }
 
