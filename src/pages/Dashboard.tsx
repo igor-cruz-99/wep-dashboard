@@ -462,7 +462,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
               {/* Tráfego por campanha: nas duas etapas. No Padrão, as campanhas
                   ocultas já saem na origem (fn_trafego + p_excluir, via queries.ts),
                   então aqui é a lista pronta. */}
-              <TrafficTable rows={data.traffic} />
+              <TrafficTable rows={data.traffic} hideLeads={view === 'padrao'} />
 
               {/* Página de captação (Meteórico) / de vendas (Padrão) */}
               {view === 'meteorico' ? (

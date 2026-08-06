@@ -17,20 +17,25 @@ interface Column {
   heat: HeatMode
 }
 
-function buildColumns(firstCol: string): Column[] {
-  return [
+function buildColumns(firstCol: string, hideLeads: boolean): Column[] {
+  const cols: Column[] = [
     { label: firstCol, get: (r) => r.nome, fmt: (r) => r.nome, num: false, agg: 'none', fmtAgg: () => '', heat: 'none' },
     { label: 'Investimento', get: (r) => r.investimento, fmt: (r) => formatBRL(r.investimento), num: true, agg: 'sum', fmtAgg: formatBRL, heat: 'heat' },
     { label: 'Vendas', get: (r) => r.vendas, fmt: (r) => formatInt(r.vendas), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
-    { label: 'Leads', get: (r) => r.leads, fmt: (r) => formatInt(r.leads), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
+  ]
+  if (!hideLeads) {
+    cols.push({ label: 'Leads', get: (r) => r.leads, fmt: (r) => formatInt(r.leads), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' })
     // CPL = Investimento ÷ Leads (custo por lead), por linha.
-    { label: 'CPL', get: (r) => (r.leads > 0 ? r.investimento / r.leads : 0), fmt: (r) => formatBRL(r.leads > 0 ? r.investimento / r.leads : 0), num: true, agg: 'avg', fmtAgg: formatBRL, heat: 'heat' },
+    cols.push({ label: 'CPL', get: (r) => (r.leads > 0 ? r.investimento / r.leads : 0), fmt: (r) => formatBRL(r.leads > 0 ? r.investimento / r.leads : 0), num: true, agg: 'avg', fmtAgg: formatBRL, heat: 'heat' })
+  }
+  cols.push(
     { label: 'CAC', get: (r) => r.cac, fmt: (r) => formatBRL(r.cac), num: true, agg: 'avg', fmtAgg: formatBRL, heat: 'heat' },
     { label: 'Qualificação', get: (r) => r.qualificacao, fmt: (r) => formatPct(r.qualificacao), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
     { label: 'Hook', get: (r) => r.hook, fmt: (r) => formatPct(r.hook), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
     { label: 'Hold', get: (r) => r.hold, fmt: (r) => formatPct(r.hold), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
     { label: 'Body', get: (r) => r.body, fmt: (r) => formatPct(r.body), num: true, agg: 'avg', fmtAgg: formatPct, heat: 'heat' },
-  ]
+  )
+  return cols
 }
 
 // Máximo de linhas renderizadas no DOM (o resto fica fora até refinar/ordenar).
@@ -76,6 +81,8 @@ interface MetricTableProps {
   onRowClick?: (row: TrafficRow) => void
   keyOf: (row: TrafficRow) => string | null
   emptyHint: string
+  /** Padrão não tem lead nessa etapa (venda direta) — tira Leads/CPL. */
+  hideLeads?: boolean
 }
 
 function MetricTable({
@@ -86,8 +93,9 @@ function MetricTable({
   onRowClick,
   keyOf,
   emptyHint,
+  hideLeads = false,
 }: MetricTableProps) {
-  const columns = useMemo(() => buildColumns(firstCol), [firstCol])
+  const columns = useMemo(() => buildColumns(firstCol, hideLeads), [firstCol, hideLeads])
   const [sort, setSort] = useState<{ idx: number; dir: 'asc' | 'desc' } | null>(null)
   const clickable = Boolean(onRowClick)
 
@@ -236,10 +244,13 @@ const includes = (hay: string, needle: string) =>
 export function TrafficTable({
   rows,
   onAdClick,
+  hideLeads = false,
 }: {
   rows: TrafficRow[]
   /** Clique numa linha de anúncio (abre o popup de preview). */
   onAdClick?: (row: TrafficRow) => void
+  /** Padrão não tem lead nessa etapa (venda direta) — tira Leads/CPL das 3 tabelas. */
+  hideLeads?: boolean
 }) {
   const [selCampanha, setSelCampanha] = useState<string | null>(null)
   const [selConjunto, setSelConjunto] = useState<string | null>(null)
@@ -319,6 +330,7 @@ export function TrafficTable({
           onRowClick={onCampanha}
           keyOf={(r) => r.campanha}
           emptyHint="Nenhuma campanha no período."
+          hideLeads={hideLeads}
         />
         <MetricTable
           title="Conjuntos"
@@ -328,6 +340,7 @@ export function TrafficTable({
           onRowClick={onConjunto}
           keyOf={(r) => r.conjunto}
           emptyHint={selCampanha ? 'Nenhum conjunto nessa campanha.' : 'Clique numa campanha para focar, ou veja todos.'}
+          hideLeads={hideLeads}
         />
         <MetricTable
           title="Anúncios"
@@ -336,6 +349,7 @@ export function TrafficTable({
           keyOf={(r) => r.anuncio}
           onRowClick={onAdClick}
           emptyHint={hasFilter ? 'Nenhum anúncio nesse filtro.' : 'Clique num anúncio para ver o preview, numa campanha/conjunto para focar.'}
+          hideLeads={hideLeads}
         />
       </div>
     </Panel>
