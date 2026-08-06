@@ -29,6 +29,8 @@ const ALLOWED_RPC = new Set([
   'fn_trafego',
   'fn_paginas',
   'fn_pesquisa_perfil',
+  'fn_quiz_perfil',
+  'fn_quiz_resumo',
   'fn_origem_leads',
   'fn_cpl_origem',
   'fn_trafego_organico',

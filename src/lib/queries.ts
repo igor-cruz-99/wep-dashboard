@@ -10,6 +10,7 @@ import type {
   PageRow,
   PerfilDatum,
   PesquisaPerfil,
+  QuizPerfil,
   SealComprador,
   SealResumo,
   SealSituacao,
@@ -400,6 +401,42 @@ export async function fetchPesquisaPerfil(filters: Filters): Promise<PesquisaPer
     profissao: pick('profissao'),
     genero: pick('genero'),
   }
+}
+
+// ── Perfil do Quiz InLead (4 gráficos) ──────────────────────────────────────
+const QUIZ_PERFIL_VAZIO: QuizPerfil = { profissao: [], renda: [], alguemNaRede: [], jaDeuConselhos: [] }
+
+export async function fetchQuizPerfil(filters: Filters): Promise<QuizPerfil> {
+  let rows: PerfilRow[]
+  try {
+    rows = (await callApi<PerfilRow[]>('fn_quiz_perfil', rpcParams(filters))) ?? []
+  } catch (err) {
+    // Bloco opcional: se a RPC ainda não foi aplicada no banco, não derruba o
+    // painel — os gráficos mostram "sem respostas" e o resto carrega normal.
+    console.warn('fn_quiz_perfil indisponível:', (err as Error)?.message)
+    return QUIZ_PERFIL_VAZIO
+  }
+  const pick = (dim: string): PerfilDatum[] =>
+    rows.filter((r) => r.dimensao === dim).map((r) => ({ categoria: r.categoria, total: Number(r.total) }))
+  return {
+    profissao: pick('profissao'),
+    renda: pick('renda'),
+    alguemNaRede: pick('alguem_na_rede'),
+    jaDeuConselhos: pick('ja_deu_conselhos'),
+  }
+}
+
+interface QuizResumoRow { respostas: number; vendas: number }
+
+export async function fetchQuizResumo(filters: Filters): Promise<{ respostas: number; vendas: number }> {
+  let rows: QuizResumoRow[]
+  try {
+    rows = (await callApi<QuizResumoRow[]>('fn_quiz_resumo', rpcParams(filters))) ?? []
+  } catch (err) {
+    console.warn('fn_quiz_resumo indisponível:', (err as Error)?.message)
+    return { respostas: 0, vendas: 0 }
+  }
+  return { respostas: Number(rows[0]?.respostas ?? 0), vendas: Number(rows[0]?.vendas ?? 0) }
 }
 
 // ── SEAL: situação de pagamento por aluno (2 cards) ─────────────────────────

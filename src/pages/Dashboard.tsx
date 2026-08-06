@@ -10,6 +10,7 @@ import { OrigemLeadsTable } from '../components/tables/OrigemLeadsTable'
 import { CplOrigemCard } from '../components/kpi/CplOrigemCard'
 import { TrafegoOrganicoPie } from '../components/charts/TrafegoOrganicoPie'
 import { PesquisaCharts } from '../components/pesquisa/PesquisaCharts'
+import { QuizCharts } from '../components/quiz/QuizCharts'
 import { SealCards } from '../components/seal/SealCards'
 import { SealDetailTable } from '../components/seal/SealDetailTable'
 import { Panel, SectionTitle } from '../components/ui/Panel'
@@ -484,6 +485,13 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                 respostas={data.pesquisaResumo.respostas}
                 leads={data.pesquisaResumo.leads}
                 title={view === 'padrao' ? 'Respostas dos compradores' : 'Respostas da pesquisa'}
+              />
+
+              {/* Quiz InLead: mesma estrutura da Pesquisa, dados de wep_quiz. */}
+              <QuizCharts
+                perfil={data.quizPerfil}
+                respostas={data.quizResumo.respostas}
+                vendas={data.quizResumo.vendas}
               />
             </div>
           )}

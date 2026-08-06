@@ -109,6 +109,14 @@ export interface PesquisaPerfil {
   genero: PerfilDatum[]
 }
 
+/** Distribuições das respostas do Quiz InLead (campanha ls-WEP-WEPAGO26-QUIZ-*). */
+export interface QuizPerfil {
+  profissao: PerfilDatum[]
+  renda: PerfilDatum[]
+  alguemNaRede: PerfilDatum[]
+  jaDeuConselhos: PerfilDatum[]
+}
+
 /** Uma situação de pagamento do SEAL (card): quantos alunos e valor somado. */
 export interface SealSituacao {
   alunos: number

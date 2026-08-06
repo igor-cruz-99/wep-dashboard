@@ -6,6 +6,8 @@ import {
   fetchOrigemLeads,
   fetchPages,
   fetchPesquisaPerfil,
+  fetchQuizPerfil,
+  fetchQuizResumo,
   fetchTrafegoOrganico,
   fetchSealCompradores,
   fetchSealResumo,
@@ -23,6 +25,7 @@ import type {
   OrigemLeadRow,
   PageRow,
   PesquisaPerfil,
+  QuizPerfil,
   SealComprador,
   SealResumo,
   TrafficRow,
@@ -50,6 +53,9 @@ export interface DashboardData {
   perfil: PesquisaPerfil
   /** Resumo do bloco Pesquisa: nº de respostas e % sobre os leads. */
   pesquisaResumo: { respostas: number; leads: number }
+  quizPerfil: QuizPerfil
+  /** Nº de respostas do Quiz InLead e vendas (status contém "Comprou") no período. */
+  quizResumo: { respostas: number; vendas: number }
   /** Entradas no grupo (bruto) — pro card de Entrada Grupo do Padrão. */
   entradasGrupo: number
   /** Brutos pro Connect Rate do funil (métrica oficial da Meta). */
@@ -92,11 +98,13 @@ export function useDashboardData(filters: Filters): State {
       fetchCplOrigem(filters),
       fetchTrafegoOrganico(filters),
       fetchPesquisaPerfil(filters),
+      fetchQuizPerfil(filters),
+      fetchQuizResumo(filters),
       fetchSealResumo(filters),
       fetchSealCompradores(filters),
       fetchSerieGrupo(filters),
     ])
-      .then(([kpiRes, funnel, series, traffic, pages, origemLeads, cplOrigem, trafegoOrganico, perfil, seal, sealCompradores, grupoPorDia]) => {
+      .then(([kpiRes, funnel, series, traffic, pages, origemLeads, cplOrigem, trafegoOrganico, perfil, quizPerfil, quizResumo, seal, sealCompradores, grupoPorDia]) => {
         if (cancelled) return
         setState({
           data: {
@@ -111,6 +119,8 @@ export function useDashboardData(filters: Filters): State {
             trafegoOrganico,
             perfil,
             pesquisaResumo: { respostas: kpiRes.respostasPesquisa, leads: kpiRes.leads },
+            quizPerfil,
+            quizResumo,
             entradasGrupo: kpiRes.entradasGrupo,
             landingPageViews: kpiRes.landingPageViews,
             linkCliques: kpiRes.linkCliques,
