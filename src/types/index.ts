@@ -76,6 +76,7 @@ export interface TrafficRow {
   adId: string | null
   investimento: number
   vendas: number
+  checkout: number
   leads: number
   cac: number
   qualificacao: number

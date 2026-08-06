@@ -17,12 +17,15 @@ interface Column {
   heat: HeatMode
 }
 
-function buildColumns(firstCol: string, hideLeads: boolean): Column[] {
+function buildColumns(firstCol: string, hideLeads: boolean, showCheckout: boolean): Column[] {
   const cols: Column[] = [
     { label: firstCol, get: (r) => r.nome, fmt: (r) => r.nome, num: false, agg: 'none', fmtAgg: () => '', heat: 'none' },
     { label: 'Investimento', get: (r) => r.investimento, fmt: (r) => formatBRL(r.investimento), num: true, agg: 'sum', fmtAgg: formatBRL, heat: 'heat' },
-    { label: 'Vendas', get: (r) => r.vendas, fmt: (r) => formatInt(r.vendas), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' },
   ]
+  if (showCheckout) {
+    cols.push({ label: 'Checkout', get: (r) => r.checkout, fmt: (r) => formatInt(r.checkout), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' })
+  }
+  cols.push({ label: 'Vendas', get: (r) => r.vendas, fmt: (r) => formatInt(r.vendas), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' })
   if (!hideLeads) {
     cols.push({ label: 'Leads', get: (r) => r.leads, fmt: (r) => formatInt(r.leads), num: true, agg: 'sum', fmtAgg: formatInt, heat: 'heat' })
     // CPL = Investimento ÷ Leads (custo por lead), por linha.
@@ -83,6 +86,8 @@ interface MetricTableProps {
   emptyHint: string
   /** Padrão não tem lead nessa etapa (venda direta) — tira Leads/CPL. */
   hideLeads?: boolean
+  /** Padrão: mostra Checkout (etapa intermediária da venda direta). */
+  showCheckout?: boolean
 }
 
 function MetricTable({
@@ -94,8 +99,9 @@ function MetricTable({
   keyOf,
   emptyHint,
   hideLeads = false,
+  showCheckout = false,
 }: MetricTableProps) {
-  const columns = useMemo(() => buildColumns(firstCol, hideLeads), [firstCol, hideLeads])
+  const columns = useMemo(() => buildColumns(firstCol, hideLeads, showCheckout), [firstCol, hideLeads, showCheckout])
   const [sort, setSort] = useState<{ idx: number; dir: 'asc' | 'desc' } | null>(null)
   const clickable = Boolean(onRowClick)
 
@@ -245,12 +251,15 @@ export function TrafficTable({
   rows,
   onAdClick,
   hideLeads = false,
+  showCheckout = false,
 }: {
   rows: TrafficRow[]
   /** Clique numa linha de anúncio (abre o popup de preview). */
   onAdClick?: (row: TrafficRow) => void
   /** Padrão não tem lead nessa etapa (venda direta) — tira Leads/CPL das 3 tabelas. */
   hideLeads?: boolean
+  /** Padrão: mostra Checkout nas 3 tabelas. */
+  showCheckout?: boolean
 }) {
   const [selCampanha, setSelCampanha] = useState<string | null>(null)
   const [selConjunto, setSelConjunto] = useState<string | null>(null)
@@ -331,6 +340,7 @@ export function TrafficTable({
           keyOf={(r) => r.campanha}
           emptyHint="Nenhuma campanha no período."
           hideLeads={hideLeads}
+          showCheckout={showCheckout}
         />
         <MetricTable
           title="Conjuntos"
@@ -341,6 +351,7 @@ export function TrafficTable({
           keyOf={(r) => r.conjunto}
           emptyHint={selCampanha ? 'Nenhum conjunto nessa campanha.' : 'Clique numa campanha para focar, ou veja todos.'}
           hideLeads={hideLeads}
+          showCheckout={showCheckout}
         />
         <MetricTable
           title="Anúncios"
@@ -350,6 +361,7 @@ export function TrafficTable({
           onRowClick={onAdClick}
           emptyHint={hasFilter ? 'Nenhum anúncio nesse filtro.' : 'Clique num anúncio para ver o preview, numa campanha/conjunto para focar.'}
           hideLeads={hideLeads}
+          showCheckout={showCheckout}
         />
       </div>
     </Panel>

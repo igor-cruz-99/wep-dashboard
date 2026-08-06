@@ -117,6 +117,7 @@ interface TrafegoRow {
   ad_id: string | null
   investimento: number
   vendas: number
+  checkouts: number
   leads: number
   cac: number
   hook: number
@@ -267,6 +268,7 @@ export async function fetchTraffic(filters: Filters): Promise<TrafficRow[]> {
     adId: r.ad_id,
     investimento: Number(r.investimento),
     vendas: Number(r.vendas),
+    checkout: Number(r.checkouts ?? 0),
     leads: Number(r.leads ?? 0), // tolera fn_trafego antiga (sem leads) até rodar o 11_leads.sql
     cac: Number(r.cac),
     qualificacao: 0, // N/A por campanha (pesquisa não tem UTM) — ver pendência
