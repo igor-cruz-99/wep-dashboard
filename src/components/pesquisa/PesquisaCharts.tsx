@@ -32,7 +32,7 @@ const PALETTE = [
 ]
 
 const BAR_COLOR = '#c9945f'
-const AXIS_TICK = { fontSize: 11, fill: '#a3907a' }
+const AXIS_TICK = { fontSize: 12, fill: '#a3907a' }
 
 const tooltipStyle = {
   borderRadius: 10,
@@ -76,7 +76,9 @@ function HBar({ data }: { data: PerfilDatum[] }) {
   const total = data.reduce((s, d) => s + d.total, 0)
   return (
     <ResponsiveContainer width="100%" height="100%">
-      {/* right maior: abre espaço para o rótulo "valor (%)" na ponta da barra. */}
+      {/* right maior: abre espaço para o rótulo "valor (%)" na ponta da barra.
+          width do YAxis maior: encolhe a área da barra pra caber o rótulo de
+          renda (ex. "De R$ 10.000 a R$ 19.000") numa linha só. */}
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, bottom: 4, left: 8 }}>
         <XAxis type="number" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: '#3a2d21' }} allowDecimals={false} />
         <YAxis
@@ -85,7 +87,7 @@ function HBar({ data }: { data: PerfilDatum[] }) {
           tick={AXIS_TICK}
           tickLine={false}
           axisLine={{ stroke: '#3a2d21' }}
-          width={130}
+          width={175}
         />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f2e9d811' }} formatter={makeTooltipFormatter(total)} />
         <Bar dataKey="total" fill={BAR_COLOR} radius={[0, 3, 3, 0]} isAnimationActive={false}>
@@ -115,12 +117,13 @@ interface PieLabelProps {
   outerRadius?: number
   percent?: number
   name?: string
+  value?: number
 }
 
 /**
  * Label externo com linha-guia (leader line): um traço sai da fatia, dobra na
- * horizontal e escreve "categoria" + "%". Desenho a linha e o texto juntos
- * (mesmo <g>) para os dois ficarem sempre alinhados.
+ * horizontal e escreve "categoria" na 1ª linha e "valor (%)" na 2ª. Desenho a
+ * linha e o texto juntos (mesmo <g>) para os dois ficarem sempre alinhados.
  */
 function renderLeaderLabel(p: PieLabelProps) {
   const RAD = Math.PI / 180
@@ -146,7 +149,7 @@ function renderLeaderLabel(p: PieLabelProps) {
         {p.name}
       </text>
       <text x={tx} y={my + 13} textAnchor={anchor} dominantBaseline="central" fontSize={10} fill="#a3907a">
-        {pct}%
+        {formatInt(p.value ?? 0)} ({pct}%)
       </text>
     </g>
   )

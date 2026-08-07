@@ -143,6 +143,7 @@ interface PieLabelProps {
   outerRadius?: number
   percent?: number
   name?: string
+  value?: number
 }
 
 function renderLeaderLabel(p: PieLabelProps) {
@@ -168,7 +169,7 @@ function renderLeaderLabel(p: PieLabelProps) {
         {p.name}
       </text>
       <text x={tx} y={my + 13} textAnchor={anchor} dominantBaseline="central" fontSize={10} fill="#a3907a">
-        {pct}%
+        {formatInt(p.value ?? 0)} ({pct}%)
       </text>
     </g>
   )
@@ -224,7 +225,7 @@ export function QuizCharts({ perfil, respostas, vendas }: QuizChartsProps) {
       <div className="mb-4 flex flex-wrap items-end gap-x-3 gap-y-1">
         <SectionTitle overline="Quiz - InLead" title="Respostas" />
         <span className="text-xl font-bold text-cream">{formatInt(respostas)}</span>
-        <span className="text-xl font-bold text-red-500">({formatInt(vendas)})</span>
+        <span className="text-xl font-bold text-cream">(Vendas: {formatInt(vendas)})</span>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <ChartFrame title="Origem Quiz">
