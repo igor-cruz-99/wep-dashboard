@@ -405,8 +405,15 @@ export async function fetchPesquisaPerfil(filters: Filters): Promise<PesquisaPer
   }
 }
 
-// ── Perfil do Quiz InLead (4 gráficos) ──────────────────────────────────────
-const QUIZ_PERFIL_VAZIO: QuizPerfil = { profissao: [], renda: [], alguemNaRede: [], jaDeuConselhos: [] }
+// ── Perfil do Quiz InLead (6 gráficos) ──────────────────────────────────────
+const QUIZ_PERFIL_VAZIO: QuizPerfil = {
+  origemQuiz: [],
+  profissao: [],
+  renda: [],
+  alguemNaRede: [],
+  jaDeuConselhos: [],
+  querAprender: [],
+}
 
 export async function fetchQuizPerfil(filters: Filters): Promise<QuizPerfil> {
   let rows: PerfilRow[]
@@ -421,10 +428,12 @@ export async function fetchQuizPerfil(filters: Filters): Promise<QuizPerfil> {
   const pick = (dim: string): PerfilDatum[] =>
     rows.filter((r) => r.dimensao === dim).map((r) => ({ categoria: r.categoria, total: Number(r.total) }))
   return {
+    origemQuiz: pick('id_forms'),
     profissao: pick('profissao'),
     renda: pick('renda'),
     alguemNaRede: pick('alguem_na_rede'),
     jaDeuConselhos: pick('ja_deu_conselhos'),
+    querAprender: pick('quer_aprender'),
   }
 }
 

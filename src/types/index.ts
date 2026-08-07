@@ -112,10 +112,12 @@ export interface PesquisaPerfil {
 
 /** Distribuições das respostas do Quiz InLead (campanha ls-WEP-WEPAGO26-QUIZ-*). */
 export interface QuizPerfil {
+  origemQuiz: PerfilDatum[] // id_forms — versão do formulário
   profissao: PerfilDatum[]
   renda: PerfilDatum[]
   alguemNaRede: PerfilDatum[]
   jaDeuConselhos: PerfilDatum[]
+  querAprender: PerfilDatum[]
 }
 
 /** Uma situação de pagamento do SEAL (card): quantos alunos e valor somado. */

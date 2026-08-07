@@ -221,27 +221,29 @@ interface QuizChartsProps {
 export function QuizCharts({ perfil, respostas, vendas }: QuizChartsProps) {
   return (
     <Panel className="p-5">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-        <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-          <SectionTitle overline="Quiz - InLead" title="Respostas" />
-          <span className="text-xl font-bold text-cream">{formatInt(respostas)}</span>
-        </div>
-        <div className="text-sm text-muted">
-          Vendas: <span className="text-base font-bold text-cream">{formatInt(vendas)}</span>
-        </div>
+      <div className="mb-4 flex flex-wrap items-end gap-x-3 gap-y-1">
+        <SectionTitle overline="Quiz - InLead" title="Respostas" />
+        <span className="text-xl font-bold text-cream">{formatInt(respostas)}</span>
+        <span className="text-xl font-bold text-red-500">({formatInt(vendas)})</span>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <ChartFrame title="Profissão">
-          <HBar data={perfil.profissao} />
+        <ChartFrame title="Origem Quiz">
+          <Donut data={perfil.origemQuiz} />
         </ChartFrame>
         <ChartFrame title="Renda">
           <Donut data={perfil.renda} inner="38%" />
+        </ChartFrame>
+        <ChartFrame title="Profissão">
+          <HBar data={perfil.profissao} />
         </ChartFrame>
         <ChartFrame title="Alguém da sua rede já te procurou pra pedir conselhos?">
           <VBar data={perfil.alguemNaRede} />
         </ChartFrame>
         <ChartFrame title="Você já deu conselhos financeiros?">
           <VBar data={perfil.jaDeuConselhos} />
+        </ChartFrame>
+        <ChartFrame title="Quer aprender?">
+          <HBar data={perfil.querAprender} />
         </ChartFrame>
       </div>
     </Panel>
