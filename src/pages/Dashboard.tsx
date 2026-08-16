@@ -5,6 +5,7 @@ import { KpiCard } from '../components/kpi/KpiCard'
 import { ChartCard } from '../components/charts/ChartCard'
 import { Funnel } from '../components/funnel/Funnel'
 import { TrafficTable } from '../components/tables/TrafficTable'
+import { AdThumbnailModal } from '../components/tables/AdThumbnailModal'
 import { PagesTable } from '../components/tables/PagesTable'
 import { OrigemLeadsTable } from '../components/tables/OrigemLeadsTable'
 import { CplOrigemCard } from '../components/kpi/CplOrigemCard'
@@ -17,7 +18,7 @@ import { Panel, SectionTitle } from '../components/ui/Panel'
 import { fetchTags } from '../lib/queries'
 import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
-import type { Filters, Kpi, PageRow, SealResumo } from '../types'
+import type { Filters, Kpi, PageRow, SealResumo, TrafficRow } from '../types'
 
 // Cores das séries. Barras em caramelo; linhas dos combos em cores distintas
 // para dar contraste (e casar com as bolinhas ao lado do título).
@@ -143,6 +144,10 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const [tags, setTags] = useState<TagWindow[]>([])
   const [view, setView] = useState<View>('meteorico')
   const [collapsed, setCollapsed] = useState(false)
+  // Anúncio clicado na tabela de tráfego (abre o popup de preview) — feature
+  // pausada e AINDA NÃO COMMITADA (memória: wep-thumbnail-anuncio-opcaoB).
+  // Fica só no disco local até retomar; não publicar sem querer.
+  const [adPreview, setAdPreview] = useState<TrafficRow | null>(null)
   const [filters, setFilters] = useState<Filters>({
     tag: 'Todas',
     from: VIEWS.meteorico.from,
@@ -464,6 +469,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                   então aqui é a lista pronta. */}
               <TrafficTable
                 rows={data.traffic}
+                onAdClick={setAdPreview}
                 hideLeads={view === 'padrao'}
                 showCheckout={view === 'padrao'}
               />
@@ -477,7 +483,15 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                 />
               ) : (
                 <PagesTable
-                  rows={data.pages.filter((p) => /vend|-pv-/i.test(p.pagina))}
+                  // Reconhece a página de vendas pelo slug (vend / -pv-) OU por
+                  // ter convertido. O slug sozinho não basta: a nomenclatura já
+                  // mudou 3 vezes e as LPs novas (wep-lp02-h1-v1) não casam com
+                  // nenhum dos dois padrões — sumiam da tabela levando junto os
+                  // checkouts e as vendas. Quem converteu é página de vendas por
+                  // definição, independente de como foi batizada.
+                  rows={data.pages.filter(
+                    (p) => /vend|-pv-/i.test(p.pagina) || p.checkout > 0 || p.vendas > 0
+                  )}
                   title="Desempenho página de vendas"
                   colKeys={['pagina', 'pageView', 'checkout', 'vendas', 'checkoutVenda', 'visitaCheckout', 'visitaVenda']}
                 />
@@ -518,6 +532,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
       )}
         </div>
       </div>
+      {adPreview && <AdThumbnailModal row={adPreview} onClose={() => setAdPreview(null)} />}
     </div>
   )
 }

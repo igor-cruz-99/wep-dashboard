@@ -279,17 +279,24 @@ export async function fetchTraffic(filters: Filters): Promise<TrafficRow[]> {
 }
 
 // ── Thumbnail do anúncio (popup ao clicar na tabela) ────────────────────────
+// Contrato do sql/33: a RPC já resolve a precedência (storage_url > image_url >
+// thumbnail_url) e devolve o vídeo só quando ele está re-hospedado no Storage.
 interface AdThumbnailRow {
   ad_id: string
   ad_name: string | null
-  thumbnail_url: string | null
-  image_url: string | null
+  url: string | null
+  video_url: string | null
+  sincronizado: boolean
 }
 export interface AdThumbnail {
   adId: string
   adName: string | null
-  /** URL pra exibir no popup: image_url tem preferência, cai pra thumbnail_url. */
+  /** Imagem/capa, já resolvida pela RPC. */
   url: string | null
+  /** Vídeo re-hospedado no Storage; null se o anúncio não é vídeo (ou não sincronizou). */
+  videoUrl: string | null
+  /** true = mídia servida do nosso Storage (não da Meta, cuja URL expira). */
+  sincronizado: boolean
 }
 
 export async function fetchAdThumbnail(adId: string): Promise<AdThumbnail | null> {
@@ -302,7 +309,13 @@ export async function fetchAdThumbnail(adId: string): Promise<AdThumbnail | null
   }
   const r = rows[0]
   if (!r) return null
-  return { adId: r.ad_id, adName: r.ad_name, url: r.image_url ?? r.thumbnail_url }
+  return {
+    adId: r.ad_id,
+    adName: r.ad_name,
+    url: r.url,
+    videoUrl: r.video_url,
+    sincronizado: Boolean(r.sincronizado),
+  }
 }
 
 // ── Páginas ─────────────────────────────────────────────────────────────────

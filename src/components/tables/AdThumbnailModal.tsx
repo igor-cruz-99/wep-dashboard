@@ -17,11 +17,13 @@ type Status = 'loading' | 'ok' | 'vazio' | 'erro'
 export function AdThumbnailModal({ row, onClose }: AdThumbnailModalProps) {
   const [status, setStatus] = useState<Status>('loading')
   const [url, setUrl] = useState<string | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelado = false
     setStatus('loading')
     setUrl(null)
+    setVideoUrl(null)
 
     if (!row.adId) {
       setStatus('vazio')
@@ -31,9 +33,11 @@ export function AdThumbnailModal({ row, onClose }: AdThumbnailModalProps) {
     fetchAdThumbnail(row.adId)
       .then((r) => {
         if (cancelado) return
-        if (!r?.url) setStatus('vazio')
+        // Anúncio de vídeo pode não ter capa; basta uma das duas mídias.
+        if (!r?.url && !r?.videoUrl) setStatus('vazio')
         else {
           setUrl(r.url)
+          setVideoUrl(r.videoUrl)
           setStatus('ok')
         }
       })
@@ -86,7 +90,21 @@ export function AdThumbnailModal({ row, onClose }: AdThumbnailModalProps) {
               Não foi possível carregar o preview agora.
             </p>
           )}
-          {status === 'ok' && url && (
+          {/* Vídeo tem precedência: a imagem, quando existe, vira só o poster.
+              Se o arquivo não estiver no Storage (o n8n às vezes grava a URL sem
+              ter subido o vídeo), cai pra imagem em vez de mostrar erro. */}
+          {status === 'ok' && videoUrl && (
+            <video
+              src={videoUrl}
+              poster={url ?? undefined}
+              controls
+              playsInline
+              preload="metadata"
+              className="max-h-[60vh] w-full rounded-xl object-contain"
+              onError={() => (url ? setVideoUrl(null) : setStatus('erro'))}
+            />
+          )}
+          {status === 'ok' && !videoUrl && url && (
             <img
               src={url}
               alt={row.nome}
