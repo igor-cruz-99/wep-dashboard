@@ -14,8 +14,11 @@
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0],
-      "id": "d1000000-0000-4000-8000-000000000001",
+      "position": [
+        0,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000001",
       "name": "A cada 6h"
     },
     {
@@ -26,11 +29,17 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "includeGridData", "value": "true" },
-            { "name": "ranges", "value": "Captura de Leads!A1:W600" },
+            {
+              "name": "includeGridData",
+              "value": "true"
+            },
+            {
+              "name": "ranges",
+              "value": "Captura de Leads!A1:W600"
+            },
             {
               "name": "fields",
-              "value": "sheets(properties(title),data(rowData(values(formattedValue,hyperlink,userEnteredFormat(textFormat(link)),textFormatRuns(format(link))))))"
+              "value": "sheets(data(rowData(values(formattedValue,hyperlink,userEnteredFormat(textFormat(link)),textFormatRuns(format(link))))))"
             }
           ]
         },
@@ -38,19 +47,25 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [220, 0],
-      "id": "d1000000-0000-4000-8000-000000000002",
+      "position": [
+        220,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000002",
       "name": "Ler planilha"
     },
     {
       "parameters": {
-        "jsCode": "// Extrai nome do anúncio (coluna B) + link do arquivo (K = feed, L = story).\n//\n// Por que não dá para usar o node \"Google Sheets\": ele devolve só o VALOR da\n// célula. Nas colunas K e L o valor é o nome do arquivo e o endereço fica no\n// hyperlink — que só aparece pedindo os campos de formatação da API.\n//\n// A API guarda o link em três lugares diferentes conforme como ele foi criado:\n//   hyperlink                          -> fórmula =HYPERLINK()\n//   userEnteredFormat.textFormat.link  -> link aplicado à célula inteira\n//   textFormatRuns[].format.link       -> link inserido pelo menu (o caso daqui)\n// Por isso testamos os três, nessa ordem.\n\nconst COL = { nome: 1, feed: 10, story: 11 }; // B, K, L (base 0)\n\nconst linkDe = (v) =>\n  v?.hyperlink ||\n  v?.userEnteredFormat?.textFormat?.link?.uri ||\n  (v?.textFormatRuns || []).map((r) => r?.format?.link?.uri).find(Boolean) ||\n  '';\n\nconst fileId = (u) =>\n  (u.match(/\\/file\\/d\\/([^/]+)/) || [])[1] ||\n  (u.match(/[?&]id=([^&]+)/) || [])[1] ||\n  '';\n\nconst tipoDe = (nome) =>\n  /_vid_/i.test(nome) ? 'video' : (/_car_/i.test(nome) ? 'carrossel' : 'imagem');\n\nconst resp = $input.first().json;\nconst rowData = resp?.sheets?.[0]?.data?.[0]?.rowData || [];\nif (rowData.length === 0) {\n  throw new Error('A API não devolveu rowData — confira o nome da aba em \"ranges\" e se a credencial tem escopo de Sheets.');\n}\n\nconst linhas = [];\nfor (let i = 1; i < rowData.length; i++) { // pula o cabeçalho\n  const v = rowData[i]?.values || [];\n  const nome = (v[COL.nome]?.formattedValue || '').trim();\n  if (!/^seal_ad/i.test(nome)) continue; // ignora legendas e linhas em branco\n\n  const feed = fileId(linkDe(v[COL.feed]));\n  const story = fileId(linkDe(v[COL.story]));\n  if (!feed && !story) continue; // sem arquivo, não entra na fila\n\n  linhas.push({\n    ad_name: nome,\n    tipo: tipoDe(nome),\n    drive_feed_id: feed || null,\n    drive_story_id: story || null,\n  });\n}\n\n// dedup por nome (a planilha repete o mesmo criativo em linhas diferentes)\nconst unicos = [...new Map(linhas.map((l) => [l.ad_name.toLowerCase(), l])).values()];\nif (unicos.length === 0) {\n  throw new Error('Nenhum criativo com link encontrado — os hyperlinks podem ter se perdido na conversão para Sheets.');\n}\n\nreturn [{ json: { total: unicos.length, rows: unicos } }];"
+        "jsCode": "// Extrai da planilha o que sobrou de útil depois da conversão xlsx -> Sheets:\n//   B  = nome do anúncio       (texto)\n//   K  = nome do arquivo feed  (texto — o hyperlink se perdeu na conversão)\n//   L  = nome do arquivo story  (texto)\n//   V  = link da PASTA no Drive (link vivo)\n// Com pasta + nome dá para achar o fileId depois, sem depender do hyperlink.\n\nconst COL = { nome: 1, feed: 10, story: 11, pasta: 21 }; // B, K, L, V (base 0)\n\nconst linkDe = (v) =>\n  v?.hyperlink ||\n  v?.userEnteredFormat?.textFormat?.link?.uri ||\n  (v?.textFormatRuns || []).map((r) => r?.format?.link?.uri).find(Boolean) ||\n  '';\n\n// aceita link de pasta e também o texto colado como URL\nconst folderId = (cel) => {\n  const bruto = linkDe(cel) || cel?.formattedValue || '';\n  return (bruto.match(/\\/folders\\/([^/?#]+)/) || [])[1] || '';\n};\n\nconst tipoDe = (nome) =>\n  /_vid_/i.test(nome) ? 'video' : (/_car_/i.test(nome) ? 'carrossel' : 'imagem');\n\nconst resp = $input.first().json;\nconst rowData = resp?.sheets?.[0]?.data?.[0]?.rowData || [];\nif (rowData.length === 0) {\n  throw new Error('A API não devolveu rowData — confira o nome da aba em \"ranges\" e o escopo da credencial.');\n}\n\nconst linhas = [];\nfor (let i = 1; i < rowData.length; i++) { // pula cabeçalho\n  const v = rowData[i]?.values || [];\n  const nome = (v[COL.nome]?.formattedValue || '').trim();\n  if (!/^seal_ad/i.test(nome)) continue;\n\n  const pasta = folderId(v[COL.pasta]);\n  const feed = (v[COL.feed]?.formattedValue || '').trim();\n  const story = (v[COL.story]?.formattedValue || '').trim();\n  if (!pasta || (!feed && !story)) continue; // sem onde ou o que procurar\n\n  linhas.push({\n    ad_name: nome,\n    tipo: tipoDe(nome),\n    drive_folder_id: pasta,\n    arquivo_feed: feed || null,\n    arquivo_story: story || null,\n  });\n}\n\nconst unicos = [...new Map(linhas.map((l) => [l.ad_name.toLowerCase(), l])).values()];\nif (unicos.length === 0) {\n  throw new Error('Nenhum criativo com pasta + nome de arquivo — a estrutura da planilha mudou?');\n}\n\nreturn [{ json: { total: unicos.length, rows: unicos } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0],
-      "id": "d1000000-0000-4000-8000-000000000003",
-      "name": "Extrair links"
+      "position": [
+        440,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000003",
+      "name": "Extrair pasta e nomes"
     },
     {
       "parameters": {
@@ -61,8 +76,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Profile", "value": "mkt_wep" },
-            { "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }
+            {
+              "name": "Content-Profile",
+              "value": "mkt_wep"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
           ]
         },
         "sendBody": true,
@@ -72,27 +93,262 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [660, 0],
-      "id": "d1000000-0000-4000-8000-000000000004",
-      "name": "Upsert criativos_drive",
+      "position": [
+        660,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000004",
+      "name": "Upsert catálogo",
       "credentials": {
-        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+        "supabaseApi": {
+          "id": "5XZTPxZZN2ZzL1vn",
+          "name": "Supabase PROD"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sfxbzfaxbbdjzuhzzrjc.supabase.co/rest/v1/rpc/fn_criativos_sem_fileid",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Profile",
+              "value": "mkt_wep"
+            },
+            {
+              "name": "Accept-Profile",
+              "value": "mkt_wep"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_limit\": 20}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000005",
+      "name": "Quem falta fileId",
+      "credentials": {
+        "supabaseApi": {
+          "id": "5XZTPxZZN2ZzL1vn",
+          "name": "Supabase PROD"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1 item por criativo a resolver. Se não há ninguém, encerra sem erro —\n// é o estado normal depois que tudo já foi resolvido.\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const lista = Array.isArray(j) ? j : (Array.isArray(j.data) ? j.data : [j]);\n  for (const r of lista) {\n    if (r && r.ad_name && r.drive_folder_id) out.push({ json: r });\n  }\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000006",
+      "name": "Normalizar fila"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"'\" + $json.drive_folder_id + \"' in parents and trashed = false\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "200"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000007",
+      "name": "Listar pasta",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Casa o arquivo do Drive com o criativo. A planilha é inconsistente no nome:\n//   - às vezes a coluna K traz o nome completo com extensão (\"..._feed.mp4\");\n//   - às vezes traz um rótulo do carrossel (\"02 - PROCURA-SE\"), que não existe\n//     no Drive — lá os arquivos se chamam pelo NOME DO ANÚNCIO com o número do\n//     slide no fim (\"seal_ad_0043_vj_car_procura-se.8\", \".7\", \".6\"...).\n// Por isso tentamos primeiro pelo nome do arquivo e depois pelo nome do anúncio.\nconst ctx = $('Normalizar fila').item.json;\nconst alvo = (ctx.arquivo_feed || ctx.arquivo_story || '').trim();\nconst arquivos = ($input.item.json.files || []).filter((f) => f && f.id);\n\nconst semExt = (s) => String(s).replace(/\\.[a-z0-9]{2,4}$/i, '');\nconst norm = (s) =>\n  String(s).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]/g, '');\n\nconst a = norm(alvo);\nconst aSemExt = norm(semExt(alvo));\nconst nomeAd = norm(semExt(ctx.ad_name || ''));\n\n// número do slide no fim do nome (\"...-procura-se.8\" -> 8); sem sufixo vira 0,\n// então o arquivo \"inteiro\" ganha da parte numerada.\nconst slide = (nome) => {\n  const m = String(nome).match(/\\.(\\d{1,3})$/);\n  return m ? Number(m[1]) : 0;\n};\nconst porSlide = (lista) => [...lista].sort((x, y) => slide(x.name) - slide(y.name))[0];\n\nlet achado =\n  arquivos.find((f) => norm(f.name) === a) ||\n  arquivos.find((f) => norm(semExt(f.name)) === aSemExt) ||\n  arquivos.find((f) => norm(f.name).startsWith(aSemExt)) ||\n  arquivos.find((f) => aSemExt.length > 5 && norm(f.name).includes(aSemExt)) ||\n  null;\n\n// Fallback pelo nome do anúncio: pega o slide de menor número (a capa).\nif (!achado && nomeAd.length > 5) {\n  const doAnuncio = arquivos.filter((f) => norm(semExt(f.name)).startsWith(nomeAd));\n  if (doAnuncio.length > 0) achado = porSlide(doAnuncio);\n}\n\n// Último recurso para carrossel: a pasta é do próprio criativo, então a\n// primeira imagem serve de capa.\nif (!achado && arquivos.length > 0 && ctx.tipo === 'carrossel') {\n  achado = porSlide(arquivos);\n}\n\nif (!achado) {\n  const candidatos = arquivos.slice(0, 5).map((f) => f.name).join(' | ') || '(pasta vazia)';\n  const msg = 'nao casou \"' + alvo + '\" em ' + arquivos.length + ' arquivos: ' + candidatos;\n  return { json: { ad_name: ctx.ad_name, patch: { erro: msg.slice(0, 300) } } };\n}\n\nconst usouFeed = Boolean(ctx.arquivo_feed);\nreturn {\n  json: {\n    ad_name: ctx.ad_name,\n    patch: usouFeed\n      ? { drive_feed_id: achado.id, erro: null }\n      : { drive_story_id: achado.id, erro: null },\n  },\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000008",
+      "name": "Casar por nome"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://sfxbzfaxbbdjzuhzzrjc.supabase.co/rest/v1/criativos_drive?ad_name=eq.{{ encodeURIComponent($json.ad_name) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Profile",
+              "value": "mkt_wep"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.patch) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "d2000000-0000-4000-8000-000000000009",
+      "name": "Gravar fileId",
+      "credentials": {
+        "supabaseApi": {
+          "id": "5XZTPxZZN2ZzL1vn",
+          "name": "Supabase PROD"
+        }
       }
     }
   ],
   "connections": {
     "A cada 6h": {
-      "main": [[{ "node": "Ler planilha", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Ler planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Ler planilha": {
-      "main": [[{ "node": "Extrair links", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Extrair pasta e nomes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Extrair links": {
-      "main": [[{ "node": "Upsert criativos_drive", "type": "main", "index": 0 }]]
+    "Extrair pasta e nomes": {
+      "main": [
+        [
+          {
+            "node": "Upsert catálogo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert catálogo": {
+      "main": [
+        [
+          {
+            "node": "Quem falta fileId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quem falta fileId": {
+      "main": [
+        [
+          {
+            "node": "Normalizar fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar fila": {
+      "main": [
+        [
+          {
+            "node": "Listar pasta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Casar por nome": {
+      "main": [
+        [
+          {
+            "node": "Gravar fileId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar pasta": {
+      "main": [
+        [
+          {
+            "node": "Casar por nome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "meta": {
     "instanceId": "0fc18357c0c79b35ae76b7ece3b32c198e6f514910c6e5b37265a9d7b94cdceb"
   }

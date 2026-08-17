@@ -14,7 +14,10 @@
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "id": "c2000000-0000-4000-8000-000000000001",
       "name": "A cada 20 min"
     },
@@ -27,8 +30,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Profile", "value": "mkt_wep" },
-            { "name": "Accept-Profile", "value": "mkt_wep" }
+            {
+              "name": "Content-Profile",
+              "value": "mkt_wep"
+            },
+            {
+              "name": "Accept-Profile",
+              "value": "mkt_wep"
+            }
           ]
         },
         "sendBody": true,
@@ -38,11 +47,17 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "id": "c2000000-0000-4000-8000-000000000002",
       "name": "Buscar pendentes",
       "credentials": {
-        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+        "supabaseApi": {
+          "id": "5XZTPxZZN2ZzL1vn",
+          "name": "Supabase PROD"
+        }
       }
     },
     {
@@ -51,7 +66,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "id": "c2000000-0000-4000-8000-000000000003",
       "name": "Normalizar"
     },
@@ -63,37 +81,33 @@
           "mode": "id",
           "value": "={{ $json.drive_file_id }}"
         },
-        "options": { "binaryPropertyName": "data" }
+        "options": {
+          "binaryPropertyName": "data"
+        }
       },
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [660, 0],
+      "position": [
+        880,
+        0
+      ],
       "id": "c2000000-0000-4000-8000-000000000004",
       "name": "Baixar do Drive",
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Decide extensão e destino pelo mimeType REAL do arquivo baixado — não pelo\n// nome do criativo. Um \"_vid_\" pode ter sido exportado como gif/imagem, e o\n// que vale para o <video> do popup é o tipo de verdade.\nconst ctx = $('Normalizar').item.json;\nconst bin = $input.item.binary?.data ?? {};\nconst mime = bin.mimeType || 'application/octet-stream';\nconst ehVideo = mime.startsWith('video/');\nconst ext = ehVideo\n  ? (mime.includes('quicktime') ? 'mov' : 'mp4')\n  : (mime.includes('png') ? 'png' : (mime.includes('gif') ? 'gif' : 'jpg'));\n\nreturn [{\n  json: { ...ctx, mime, ehVideo, destino: `${ctx.slug}.${ext}` },\n  binary: $input.item.binary,\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [880, -110],
-      "id": "c2000000-0000-4000-8000-000000000005",
-      "name": "Montar destino"
-    },
-    {
-      "parameters": {
         "method": "POST",
-        "url": "=https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/ad-creatives/{{ $json.destino }}",
+        "url": "=https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/ad-creatives/{{ $('Um por vez').item.json.slug }}.{{ $binary.data.mimeType.startsWith('video/') ? 'mp4' : ($binary.data.mimeType.includes('png') ? 'png' : ($binary.data.mimeType.includes('gif') ? 'gif' : 'jpg')) }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-upsert", "value": "true" },
-            { "name": "Content-Type", "value": "={{ $json.mime }}" },
-            { "name": "Cache-Control", "value": "max-age=31536000" }
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
           ]
         },
         "sendBody": true,
@@ -103,30 +117,44 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1100, -110],
+      "position": [
+        1100,
+        -110
+      ],
       "id": "c2000000-0000-4000-8000-000000000006",
       "name": "Upload Storage",
       "credentials": {
-        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+        "supabaseApi": {
+          "id": "5XZTPxZZN2ZzL1vn",
+          "name": "Supabase PROD"
+        }
       }
     },
     {
       "parameters": {
-        "jsCode": "// SÓ grava a URL depois que o Storage confirmou o upload. Era exatamente esse\n// o bug do workflow antigo da Meta: montava a URL por convenção e gravava\n// mesmo quando o upload falhava — o bucket ficou com ZERO .mp4 e o banco com\n// 130 storage_video_url apontando para 404.\nconst ctx = $('Montar destino').item.json;\nconst resp = $input.item.json ?? {};\nconst ok = resp.Key || resp.Id || resp.key || resp.id;\n\nif (!ok) {\n  return [{ json: { ad_name: ctx.ad_name, patch: { erro: 'upload sem confirmacao: ' + JSON.stringify(resp).slice(0, 200), synced_at: new Date().toISOString() } } }];\n}\n\nconst publica = `https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/public/ad-creatives/${ctx.destino}`;\nconst patch = ctx.ehVideo\n  ? { storage_video_url: publica, synced_at: new Date().toISOString(), erro: null }\n  : { storage_url: publica, synced_at: new Date().toISOString(), erro: null };\n\nreturn [{ json: { ad_name: ctx.ad_name, patch } }];"
+        "jsCode": "// SÓ grava a URL depois que o Storage confirmou o upload. Era esse o bug do\n// workflow antigo da Meta: montava a URL por convenção e gravava mesmo quando\n// o upload falhava — o bucket ficou com ZERO .mp4 e o banco com 130\n// storage_video_url apontando para 404.\n//\n// O destino é recalculado aqui a partir do mimeType do download, porque o\n// binário não passa mais por Code node (era o que estourava o payload).\nconst ctx = $('Um por vez').item.json;\nconst mime = $('Baixar do Drive').item.binary?.data?.mimeType || 'application/octet-stream';\nconst ehVideo = mime.startsWith('video/');\nconst ext = ehVideo\n  ? 'mp4'\n  : (mime.includes('png') ? 'png' : (mime.includes('gif') ? 'gif' : 'jpg'));\nconst destino = ctx.slug + '.' + ext;\n\nconst resp = $input.item.json ?? {};\nconst ok = resp.Key || resp.Id || resp.key || resp.id;\n\nif (!ok) {\n  return {\n    json: {\n      ad_name: ctx.ad_name,\n      patch: {\n        erro: ('upload sem confirmacao: ' + JSON.stringify(resp)).slice(0, 300),\n        synced_at: new Date().toISOString(),\n      },\n    },\n  };\n}\n\nconst publica =\n  'https://sfxbzfaxbbdjzuhzzrjc.supabase.co/storage/v1/object/public/ad-creatives/' + destino;\nconst patch = ehVideo\n  ? { storage_video_url: publica, synced_at: new Date().toISOString(), erro: null }\n  : { storage_url: publica, synced_at: new Date().toISOString(), erro: null };\n\nreturn { json: { ad_name: ctx.ad_name, patch } };",
+        "mode": "runOnceForEachItem"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, -110],
+      "position": [
+        1320,
+        -110
+      ],
       "id": "c2000000-0000-4000-8000-000000000007",
       "name": "Confirmar upload"
     },
     {
       "parameters": {
-        "jsCode": "// Ramo de falha do download (arquivo removido do Drive, sem permissão, etc).\n// Marca synced_at para o mesmo criativo não ser tentado a cada 20 min para\n// sempre — o motivo fica na coluna erro para inspeção.\nconst ctx = $('Normalizar').item.json;\nconst msg = $input.item.json?.error?.message || $input.item.json?.message || 'falha ao baixar do Drive';\nreturn [{\n  json: {\n    ad_name: ctx.ad_name,\n    patch: { erro: String(msg).slice(0, 300), synced_at: new Date().toISOString() },\n  },\n}];"
+        "jsCode": "// Ramo de falha do download (arquivo removido do Drive, sem permissão, queda de\n// rede). Marca synced_at para o mesmo criativo não ser tentado a cada 20 min\n// para sempre — o motivo fica na coluna erro para inspeção.\nconst ctx = $('Um por vez').item.json ?? {};\nconst j = $input.item.json ?? {};\nconst msg =\n  j.error?.message || j.message || (typeof j.error === 'string' ? j.error : '') || 'falha ao baixar do Drive';\n\nreturn {\n  json: {\n    ad_name: ctx.ad_name ?? j.ad_name ?? null,\n    patch: { erro: String(msg).slice(0, 300), synced_at: new Date().toISOString() },\n  },\n};",
+        "mode": "runOnceForEachItem"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 110],
+      "position": [
+        1100,
+        110
+      ],
       "id": "c2000000-0000-4000-8000-000000000008",
       "name": "Marcar erro"
     },
@@ -139,8 +167,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Profile", "value": "mkt_wep" },
-            { "name": "Prefer", "value": "return=minimal" }
+            {
+              "name": "Content-Profile",
+              "value": "mkt_wep"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
           ]
         },
         "sendBody": true,
@@ -150,45 +184,147 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1540, 0],
+      "position": [
+        1760,
+        0
+      ],
       "id": "c2000000-0000-4000-8000-000000000009",
       "name": "Atualizar registro",
       "credentials": {
-        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+        "supabaseApi": {
+          "id": "5XZTPxZZN2ZzL1vn",
+          "name": "Supabase PROD"
+        }
       }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        0
+      ],
+      "id": "c2000000-0000-4000-8000-00000000000a",
+      "name": "Um por vez"
     }
   ],
   "connections": {
     "A cada 20 min": {
-      "main": [[{ "node": "Buscar pendentes", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Buscar pendentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Buscar pendentes": {
-      "main": [[{ "node": "Normalizar", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Normalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Normalizar": {
-      "main": [[{ "node": "Baixar do Drive", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Um por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Baixar do Drive": {
       "main": [
-        [{ "node": "Montar destino", "type": "main", "index": 0 }],
-        [{ "node": "Marcar erro", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Upload Storage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Montar destino": {
-      "main": [[{ "node": "Upload Storage", "type": "main", "index": 0 }]]
-    },
     "Upload Storage": {
-      "main": [[{ "node": "Confirmar upload", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Confirmar upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Confirmar upload": {
-      "main": [[{ "node": "Atualizar registro", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Atualizar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Marcar erro": {
-      "main": [[{ "node": "Atualizar registro", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Atualizar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Um por vez": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Baixar do Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar registro": {
+      "main": [
+        [
+          {
+            "node": "Um por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "meta": {
     "instanceId": "0fc18357c0c79b35ae76b7ece3b32c198e6f514910c6e5b37265a9d7b94cdceb"
   }

@@ -17,8 +17,16 @@ dist-ssr
 .env.local
 .env.*.local
 
-# Scripts de diagnóstico local (podem conter chaves em texto)
-scripts/
+# Scripts de diagnóstico local (podem conter chaves em texto).
+# É "scripts/*" e não "scripts/": o git não entra em diretório ignorado, e as
+# exceções abaixo só funcionam se o ignore for do conteúdo.
+scripts/*
+
+# Exceções: scripts operacionais, sem chave no código (leem do .env.local).
+# Versionados de propósito — sem eles ninguém consegue re-sincronizar a mídia
+# dos criativos se esta máquina sair de cena.
+!scripts/drive-auth.mjs
+!scripts/sync-criativos-drive.mjs
 
 # Editor directories and files
 .vscode/*
