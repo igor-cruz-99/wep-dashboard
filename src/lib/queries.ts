@@ -58,6 +58,17 @@ function excluirParam(filters: Filters): { p_excluir?: string[] } {
 }
 
 /**
+ * No Padrão (venda direta) o Page Views do funil conta só página de venda —
+ * mesmo critério da tabela "Desempenho página de vendas" logo abaixo. Sem isso
+ * o funil somava as páginas de captação e não batia com a tabela (417 views de
+ * diferença em 31/07-21/08), além de diluir Conversão página e CPLV.
+ * Omitido fora do Padrão: aí a RPC usa o default (false) e nada muda.
+ */
+function soVendasParam(filters: Filters): { p_so_vendas?: boolean } {
+  return filters.grupo === 'padrao' ? { p_so_vendas: true } : {}
+}
+
+/**
  * Chama o "porteiro" (/api/dashboard) mandando o token da sessão.
  * O servidor valida a sessão e só então consulta o banco — o navegador
  * nunca fala direto com o Supabase de dados.
@@ -196,7 +207,11 @@ export async function fetchKpis(filters: Filters): Promise<KpisResult> {
 
 // ── Funil ───────────────────────────────────────────────────────────────────
 export async function fetchFunnel(filters: Filters): Promise<FunnelStage[]> {
-  const data = await callApi<FunilRow[]>('fn_funil', { ...rpcParamsO(filters), ...excluirParam(filters) })
+  const data = await callApi<FunilRow[]>('fn_funil', {
+    ...rpcParamsO(filters),
+    ...excluirParam(filters),
+    ...soVendasParam(filters),
+  })
   return (data ?? []).map((r) => ({
     label: r.etapa,
     value: Number(r.valor),

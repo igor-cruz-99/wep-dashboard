@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// DIAGNÓSTICO — não grava nada, só descreve o que a API devolveu.\n// Ligar depois do node \"Ler planilha\" e olhar a saída.\n\nconst resp = $input.first().json;\nconst rowData = resp?.sheets?.[0]?.data?.[0]?.rowData || [];\n\nconst linkDe = (v) => ({\n  hyperlink: v?.hyperlink || '',\n  cellFormat: v?.userEnteredFormat?.textFormat?.link?.uri || '',\n  textRun: (v?.textFormatRuns || []).map((r) => r?.format?.link?.uri).find(Boolean) || '',\n});\n\n// 1) cabeçalho: índice + letra + título de cada coluna\nconst letra = (i) => String.fromCharCode(65 + i);\nconst cabecalho = (rowData[0]?.values || []).map((v, i) => ({\n  i,\n  col: letra(i),\n  titulo: v?.formattedValue || '',\n})).filter((c) => c.titulo);\n\n// 2) onde existe link, em qualquer célula da planilha inteira\nconst linksPorColuna = {};\nlet totalComLink = 0;\nrowData.forEach((row) => {\n  (row?.values || []).forEach((v, i) => {\n    const l = linkDe(v);\n    const achou = l.hyperlink || l.cellFormat || l.textRun;\n    if (!achou) return;\n    totalComLink++;\n    const k = letra(i);\n    linksPorColuna[k] = linksPorColuna[k] || { total: 0, via: {}, exemplo: '' };\n    linksPorColuna[k].total++;\n    const via = l.hyperlink ? 'hyperlink' : (l.cellFormat ? 'cellFormat' : 'textRun');\n    linksPorColuna[k].via[via] = (linksPorColuna[k].via[via] || 0) + 1;\n    if (!linksPorColuna[k].exemplo) linksPorColuna[k].exemplo = achou.slice(0, 90);\n  });\n});\n\n// 3) as 3 primeiras linhas de dados, célula a célula\nconst amostra = [];\nfor (let i = 1; i < Math.min(rowData.length, 4); i++) {\n  const cels = (rowData[i]?.values || []).map((v, j) => {\n    const l = linkDe(v);\n    const link = l.hyperlink || l.cellFormat || l.textRun;\n    const valor = v?.formattedValue || '';\n    if (!valor && !link) return null;\n    return { col: letra(j), valor: valor.slice(0, 45), link: link ? link.slice(0, 70) : '' };\n  }).filter(Boolean);\n  amostra.push({ linha: i + 1, cels });\n}\n\n// 4) quantos nomes casam com o filtro atual\nconst COL_NOME = 1; // B\nconst nomesColB = rowData.slice(1)\n  .map((r) => (r?.values?.[COL_NOME]?.formattedValue || '').trim())\n  .filter(Boolean);\n\nreturn [{ json: {\n  totalLinhas: rowData.length,\n  cabecalho,\n  linksPorColuna,\n  totalCelulasComLink: totalComLink,\n  colunaB: {\n    preenchidas: nomesColB.length,\n    casamComSeal_ad: nomesColB.filter((n) => /^seal_ad/i.test(n)).length,\n    primeiros5: nomesColB.slice(0, 5),\n  },\n  amostra,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 200],
+      "id": "e1000000-0000-4000-8000-000000000001",
+      "name": "Diagnóstico planilha"
+    }
+  ],
+  "connections": {},
+  "pinData": {},
+  "meta": {
+    "instanceId": "0fc18357c0c79b35ae76b7ece3b32c198e6f514910c6e5b37265a9d7b94cdceb"
+  }
+}

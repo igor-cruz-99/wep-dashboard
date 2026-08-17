@@ -1,0 +1,99 @@
+{
+  "name": "[WEP] Planilha → criativos_drive",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "d1000000-0000-4000-8000-000000000001",
+      "name": "A cada 6h"
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1qVCw1IXojaIkXUyZ6N-HkwsiPNg7Ag0kCnsCerWCyuw",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "includeGridData", "value": "true" },
+            { "name": "ranges", "value": "Captura de Leads!A1:W600" },
+            {
+              "name": "fields",
+              "value": "sheets(properties(title),data(rowData(values(formattedValue,hyperlink,userEnteredFormat(textFormat(link)),textFormatRuns(format(link))))))"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [220, 0],
+      "id": "d1000000-0000-4000-8000-000000000002",
+      "name": "Ler planilha"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrai nome do anúncio (coluna B) + link do arquivo (K = feed, L = story).\n//\n// Por que não dá para usar o node \"Google Sheets\": ele devolve só o VALOR da\n// célula. Nas colunas K e L o valor é o nome do arquivo e o endereço fica no\n// hyperlink — que só aparece pedindo os campos de formatação da API.\n//\n// A API guarda o link em três lugares diferentes conforme como ele foi criado:\n//   hyperlink                          -> fórmula =HYPERLINK()\n//   userEnteredFormat.textFormat.link  -> link aplicado à célula inteira\n//   textFormatRuns[].format.link       -> link inserido pelo menu (o caso daqui)\n// Por isso testamos os três, nessa ordem.\n\nconst COL = { nome: 1, feed: 10, story: 11 }; // B, K, L (base 0)\n\nconst linkDe = (v) =>\n  v?.hyperlink ||\n  v?.userEnteredFormat?.textFormat?.link?.uri ||\n  (v?.textFormatRuns || []).map((r) => r?.format?.link?.uri).find(Boolean) ||\n  '';\n\nconst fileId = (u) =>\n  (u.match(/\\/file\\/d\\/([^/]+)/) || [])[1] ||\n  (u.match(/[?&]id=([^&]+)/) || [])[1] ||\n  '';\n\nconst tipoDe = (nome) =>\n  /_vid_/i.test(nome) ? 'video' : (/_car_/i.test(nome) ? 'carrossel' : 'imagem');\n\nconst resp = $input.first().json;\nconst rowData = resp?.sheets?.[0]?.data?.[0]?.rowData || [];\nif (rowData.length === 0) {\n  throw new Error('A API não devolveu rowData — confira o nome da aba em \"ranges\" e se a credencial tem escopo de Sheets.');\n}\n\nconst linhas = [];\nfor (let i = 1; i < rowData.length; i++) { // pula o cabeçalho\n  const v = rowData[i]?.values || [];\n  const nome = (v[COL.nome]?.formattedValue || '').trim();\n  if (!/^seal_ad/i.test(nome)) continue; // ignora legendas e linhas em branco\n\n  const feed = fileId(linkDe(v[COL.feed]));\n  const story = fileId(linkDe(v[COL.story]));\n  if (!feed && !story) continue; // sem arquivo, não entra na fila\n\n  linhas.push({\n    ad_name: nome,\n    tipo: tipoDe(nome),\n    drive_feed_id: feed || null,\n    drive_story_id: story || null,\n  });\n}\n\n// dedup por nome (a planilha repete o mesmo criativo em linhas diferentes)\nconst unicos = [...new Map(linhas.map((l) => [l.ad_name.toLowerCase(), l])).values()];\nif (unicos.length === 0) {\n  throw new Error('Nenhum criativo com link encontrado — os hyperlinks podem ter se perdido na conversão para Sheets.');\n}\n\nreturn [{ json: { total: unicos.length, rows: unicos } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "id": "d1000000-0000-4000-8000-000000000003",
+      "name": "Extrair links"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sfxbzfaxbbdjzuhzzrjc.supabase.co/rest/v1/criativos_drive?on_conflict=ad_name",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Profile", "value": "mkt_wep" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.rows) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [660, 0],
+      "id": "d1000000-0000-4000-8000-000000000004",
+      "name": "Upsert criativos_drive",
+      "credentials": {
+        "supabaseApi": { "id": "5XZTPxZZN2ZzL1vn", "name": "Supabase PROD" }
+      }
+    }
+  ],
+  "connections": {
+    "A cada 6h": {
+      "main": [[{ "node": "Ler planilha", "type": "main", "index": 0 }]]
+    },
+    "Ler planilha": {
+      "main": [[{ "node": "Extrair links", "type": "main", "index": 0 }]]
+    },
+    "Extrair links": {
+      "main": [[{ "node": "Upsert criativos_drive", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "instanceId": "0fc18357c0c79b35ae76b7ece3b32c198e6f514910c6e5b37265a9d7b94cdceb"
+  }
+}
