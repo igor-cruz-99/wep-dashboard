@@ -260,15 +260,18 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
 
   // Funil por etapa:
   //  - Meteórico: tira Checkouts (Leads→Vendas).
-  //  - Padrão: tira Leads (Page Views→Checkouts→Vendas) e o Page Views passa a ser
-  //    só das páginas de VENDA (vend) — calculado no front sobre data.pages.
-  const vendPageViews = data ? data.pages.filter((p) => /vend|-pv-/i.test(p.pagina)).reduce((a, p) => a + p.pageView, 0) : 0
+  //  - Padrão: tira Leads (Page Views→Checkouts→Vendas).
+  //
+  // O Page Views do Padrão (só páginas de venda) é calculado no BANCO, via
+  // p_so_vendas na fn_funil (sql/64). Antes era recalculado aqui filtrando
+  // data.pages por /vend|-pv-/, o que ignorava as páginas que converteram sem
+  // ter esse padrão no slug: as LPs novas (wep-lp02-h1-v1, wep-lp04-h1-v4)
+  // sumiam e o funil mostrava 33 onde a tabela mostrava 462. Um cálculo só,
+  // na mesma fonte da tabela, evita os dois números divergirem de novo.
   const funnelStages = !data
     ? []
     : view === 'padrao'
-      ? data.funnel
-          .filter((s) => s.label !== 'Leads')
-          .map((s) => (s.label === 'Page Views' ? { ...s, value: vendPageViews } : s))
+      ? data.funnel.filter((s) => s.label !== 'Leads')
       : view === 'meteorico'
         ? data.funnel.filter((s) => s.label !== 'Checkouts')
         : data.funnel
