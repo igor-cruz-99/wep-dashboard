@@ -19,6 +19,14 @@ export interface Kpi {
   na?: boolean
   /** Texto sob o "—" quando na=true. Default: "sem recorte por origem". */
   naNote?: string
+  /**
+   * Percentual exibido ao lado do valor principal e usado na comparação com a
+   * meta — para cards em que o número absoluto e o percentual dizem coisas
+   * diferentes. Ex.: Entrada Grupo mostra "71" (pessoas no grupo) com "102,9%"
+   * ao lado (entradas ÷ vendas), e é esse percentual, não o 71, que se compara
+   * com a meta de 80%. Sem este campo, a meta é comparada com `value`.
+   */
+  pctLado?: number
 }
 
 /** Recorte por origem da captação (teste A/B: páginas vs formulário nativo). */

@@ -78,13 +78,19 @@ function kpisForView(view: View, kpis: Kpi[], pages: PageRow[], seal: SealResumo
       format: 'pct',
       direction: 'normal',
     }
-    // Entrada Grupo do Padrão = entradas no grupo padrão ÷ vendas (ingresso).
+    // Entrada Grupo do Padrão: o número de pessoas no grupo é o valor principal,
+    // e o percentual (entradas ÷ vendas) fica ao lado. É o percentual, não o
+    // número, que se compara com a meta_grupo da wep_tags — ela é percentual,
+    // como a meta_qualificacao ao lado dela na tabela.
     const vendasIng = Number(by('vendas')?.value ?? 0)
+    const grupoPct = vendasIng > 0 ? (entradasGrupo / vendasIng) * 100 : 0
     const grupoPadrao: Kpi = {
       id: 'grupo',
       label: 'Entrada Grupo',
-      value: vendasIng > 0 ? (entradasGrupo / vendasIng) * 100 : 0,
-      format: 'pct',
+      value: entradasGrupo,
+      pctLado: grupoPct,
+      meta: by('grupo')?.meta,
+      format: 'int',
       direction: 'normal',
       na: vendasIng === 0,
       naNote: 'sem vendas no período',

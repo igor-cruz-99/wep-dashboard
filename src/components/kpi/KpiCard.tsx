@@ -49,7 +49,11 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
 
   // Sem meta (ex.: CPL): card mostra só o valor, sem %meta/seta/barra.
   const hasMeta = typeof kpi.meta === 'number' && kpi.meta > 0
-  const pct = hasMeta ? (kpi.value / (kpi.meta as number)) * 100 : 0
+  // Quando o card tem um percentual ao lado (Entrada Grupo), é ELE que se
+  // compara com a meta — não o número absoluto. Os dois medem coisas
+  // diferentes: 71 pessoas no grupo vs. 102,9% de quem comprou.
+  const baseMeta = typeof kpi.pctLado === 'number' ? kpi.pctLado : kpi.value
+  const pct = hasMeta ? (baseMeta / (kpi.meta as number)) * 100 : 0
   const score = metaScore(pct, kpi.direction)
   const color = metaColor(pct, kpi.direction)
   const good = score >= 0.5
@@ -79,13 +83,21 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
         )}
       </div>
 
-      <p className="mt-2 text-3xl font-bold tracking-tight text-cream">
+      <p className="mt-2 flex items-baseline gap-2 text-3xl font-bold tracking-tight text-cream">
         {formatValue(kpi.value, kpi.format)}
+        {typeof kpi.pctLado === 'number' && (
+          <span className="text-lg font-semibold text-muted">{formatPct(kpi.pctLado)}</span>
+        )}
       </p>
 
       {hasMeta && (
         <>
-          <p className="mt-1 text-xs text-muted">Meta {formatValue(kpi.meta as number, kpi.format)}</p>
+          {/* A meta acompanha o que ela mede: quando há percentual ao lado, é
+              com ele que a meta se compara, então exibe como percentual mesmo
+              que o valor principal seja um inteiro (ex.: Entrada Grupo). */}
+          <p className="mt-1 text-xs text-muted">
+            Meta {formatValue(kpi.meta as number, typeof kpi.pctLado === 'number' ? 'pct' : kpi.format)}
+          </p>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-card-2">
             <div
               className="h-full rounded-full"
