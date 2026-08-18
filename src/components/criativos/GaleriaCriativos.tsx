@@ -83,7 +83,7 @@ function Card({ c, onAbrir }: { c: CriativoGaleria; onAbrir: () => void }) {
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-3">
-        <p className="line-clamp-2 text-xs font-semibold text-cream" title={c.adName}>
+        <p className="line-clamp-2 text-sm font-semibold text-cream" title={c.adName}>
           {c.adName}
         </p>
 
@@ -98,7 +98,7 @@ function Card({ c, onAbrir }: { c: CriativoGaleria; onAbrir: () => void }) {
           />
         </div>
 
-        <div className="flex items-center justify-between border-t border-line pt-2 text-[11px] text-muted">
+        <div className="flex items-center justify-between border-t border-line pt-2 text-[13px] text-muted">
           <span>{formatBRL(c.investimento)}</span>
           <span>
             {c.campanhas} {c.campanhas === 1 ? 'campanha' : 'campanhas'}
@@ -147,7 +147,7 @@ export function GaleriaCriativos({
           <h2 className="text-lg font-bold text-cream">
             {lista.length} {lista.length === 1 ? 'anúncio' : 'anúncios'} no período
           </h2>
-          <p className="mt-0.5 text-xs text-muted">
+          <p className="mt-0.5 text-sm text-muted">
             {formatBRL(totalGasto)} investidos · {formatInt(totalVendas)} vendas
           </p>
         </div>

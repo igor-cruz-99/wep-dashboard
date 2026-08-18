@@ -16,7 +16,10 @@
  *   node scripts/sync-criativos-drive.mjs 5         # processa só os 5 primeiros
  */
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, unlinkSync, statSync, mkdtempSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8')
@@ -77,9 +80,66 @@ async function pegarAccessToken() {
 const ACCESS_TOKEN = await pegarAccessToken()
 
 // O Storage recusa acima de 50 MB (413 EntityTooLarge — testado: 50 passa,
-// 55 não). Os vídeos no Drive são masters de edição, chegando a 1 GB, então
-// para eles subimos a capa que o próprio Drive gera em vez do arquivo.
+// 55 não), e é limite do plano: a API recusa aumentar o do bucket.
+// Os vídeos no Drive são masters de edição — média de 184 MB, o maior com 1 GB.
 const LIMITE_BYTES = 48 * 1024 * 1024 // margem sobre os 50 MB
+
+// Caminho do ffmpeg instalado pelo winget (não entra no PATH do shell).
+const FFMPEG =
+  process.env.FFMPEG_PATH ??
+  'C:/Users/Admin/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-9.0-full_build/bin/ffmpeg.exe'
+
+let ffmpegOk = null
+function temFfmpeg() {
+  if (ffmpegOk !== null) return ffmpegOk
+  try {
+    execFileSync(FFMPEG, ['-version'], { stdio: 'ignore' })
+    ffmpegOk = true
+  } catch {
+    ffmpegOk = false
+  }
+  return ffmpegOk
+}
+
+/**
+ * Reencoda o vídeo para caber no Storage.
+ *
+ * 720p / CRF 28 / preset veryfast: um master de 184 MB vira algo entre 8 e
+ * 20 MB, sem perda visível num player de dashboard. O áudio cai para 96 kbps —
+ * o objetivo aqui é conferir o criativo, não arquivar em qualidade de edição.
+ * O -movflags +faststart põe o índice no começo do arquivo, senão o navegador
+ * precisa baixar tudo antes de começar a tocar.
+ */
+function comprimirVideo(buf) {
+  const dir = mkdtempSync(join(tmpdir(), 'wep-video-'))
+  const entrada = join(dir, 'in.mp4')
+  const saida = join(dir, 'out.mp4')
+  try {
+    writeFileSync(entrada, buf)
+    execFileSync(
+      FFMPEG,
+      [
+        '-y', '-i', entrada,
+        '-vf', "scale='min(1280,iw)':-2",
+        '-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast',
+        '-c:a', 'aac', '-b:a', '96k',
+        '-movflags', '+faststart',
+        saida,
+      ],
+      { stdio: 'ignore', timeout: 15 * 60 * 1000 }
+    )
+    const tamanho = statSync(saida).size
+    if (tamanho === 0 || tamanho > LIMITE_BYTES) {
+      return { erro: `compressao gerou ${(tamanho / 1048576).toFixed(0)} MB, ainda acima do limite` }
+    }
+    return { buf: readFileSync(saida), mime: 'video/mp4' }
+  } catch (e) {
+    return { erro: 'ffmpeg falhou: ' + String(e.message || e).slice(0, 100) }
+  } finally {
+    try { unlinkSync(entrada) } catch {}
+    try { rmSync(dir, { recursive: true, force: true }) } catch {}
+  }
+}
 
 /** Metadados do arquivo: tamanho, tipo e link da capa. */
 async function metadados(fileId) {
@@ -102,6 +162,31 @@ async function baixarDoDrive(fileId) {
 
   const tamanho = Number(meta.size || 0)
   const grande = tamanho > LIMITE_BYTES
+
+  const ehVideoGrande = grande && String(meta.mimeType || '').startsWith('video/')
+
+  // Vídeo grande: baixa o master e comprime, em vez de desistir e subir a capa.
+  // Só cai para a capa se não houver ffmpeg ou se a compressão não bastar.
+  if (ehVideoGrande && temFfmpeg()) {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+      redirect: 'follow',
+    })
+    if (r.ok) {
+      const original = Buffer.from(await r.arrayBuffer())
+      const comprimido = comprimirVideo(original)
+      if (comprimido.buf) {
+        return {
+          buf: comprimido.buf,
+          mime: 'video/mp4',
+          comprimidoDe: (tamanho / 1048576).toFixed(0),
+          para: (comprimido.buf.length / 1048576).toFixed(1),
+        }
+      }
+      // não deu: segue para a capa, registrando o motivo no log
+      console.log(`      (compressão não resolveu: ${comprimido.erro} — usando a capa)`)
+    }
+  }
 
   if (grande) {
     if (!meta.thumbnailLink) {
@@ -166,6 +251,7 @@ console.log(`fila: ${fila.length} criativos\n`)
 let ok = 0
 let falhou = 0
 let capas = 0
+let comprimidos = 0
 let bytes = 0
 
 for (const [i, c] of fila.entries()) {
@@ -211,8 +297,13 @@ for (const [i, c] of fila.entries()) {
   bytes += baixado.buf.length
   ok++
   if (baixado.capaDe) capas++
+  if (baixado.comprimidoDe) comprimidos++
   const kb = (baixado.buf.length / 1024).toFixed(0)
-  const nota = baixado.capaDe ? `capa (video de ${baixado.capaDe} MB)` : baixado.mime
+  const nota = baixado.comprimidoDe
+    ? `video comprimido ${baixado.comprimidoDe} MB -> ${baixado.para} MB`
+    : baixado.capaDe
+      ? `capa (video de ${baixado.capaDe} MB)`
+      : baixado.mime
   console.log(`${pos} ${nome} ok  ${String(kb).padStart(6)} KB  ${nota}`)
 }
 
