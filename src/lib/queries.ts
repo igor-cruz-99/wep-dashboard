@@ -2,6 +2,7 @@ import { supabaseAuth } from './supabase'
 import { DEV_SKIP_AUTH } from './devAuth'
 import type {
   CplOrigem,
+  CriativoGaleria,
   TrafegoOrganico,
   DailyPoint,
   FunnelStage,
@@ -331,6 +332,41 @@ export async function fetchAdThumbnail(adId: string): Promise<AdThumbnail | null
     videoUrl: r.video_url,
     sincronizado: Boolean(r.sincronizado),
   }
+}
+
+// ── Galeria de criativos ────────────────────────────────────────────────────
+interface CriativoRow {
+  ad_name: string
+  tipo: string | null
+  storage_url: string | null
+  storage_video_url: string | null
+  investimento: number
+  vendas: number
+  checkouts: number
+  cac: number
+  campanhas: number
+}
+
+/**
+ * Criativos com mídia e gasto no período, um por peça (soma as campanhas).
+ * Já vem ordenado por investimento na RPC.
+ */
+export async function fetchCriativos(filters: Filters): Promise<CriativoGaleria[]> {
+  const data = await callApi<CriativoRow[]>('fn_criativos_galeria', {
+    p_from: filters.from || null,
+    p_to: filters.to || null,
+  })
+  return (data ?? []).map((r) => ({
+    adName: r.ad_name,
+    tipo: r.tipo ?? 'imagem',
+    url: r.storage_url,
+    videoUrl: r.storage_video_url,
+    investimento: Number(r.investimento),
+    vendas: Number(r.vendas),
+    checkouts: Number(r.checkouts),
+    cac: Number(r.cac),
+    campanhas: Number(r.campanhas),
+  }))
 }
 
 // ── Páginas ─────────────────────────────────────────────────────────────────

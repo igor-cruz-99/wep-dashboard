@@ -29,6 +29,24 @@ export interface Kpi {
   pctLado?: number
 }
 
+/**
+ * Criativo na galeria de anúncios: a peça com seu desempenho no período,
+ * somando todas as campanhas em que rodou. Só existe para criativo com mídia
+ * já sincronizada do Drive.
+ */
+export interface CriativoGaleria {
+  adName: string
+  tipo: string
+  url: string | null
+  videoUrl: string | null
+  investimento: number
+  vendas: number
+  checkouts: number
+  cac: number
+  /** Em quantas campanhas a peça rodou — um CAC alto pode ser de uma delas só. */
+  campanhas: number
+}
+
 /** Recorte por origem da captação (teste A/B: páginas vs formulário nativo). */
 export type Origem = 'todas' | 'pagina' | 'nativo'
 

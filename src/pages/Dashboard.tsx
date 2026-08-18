@@ -7,6 +7,8 @@ import { Funnel } from '../components/funnel/Funnel'
 import { TrafficTable } from '../components/tables/TrafficTable'
 import { AdThumbnailModal } from '../components/tables/AdThumbnailModal'
 import { PagesTable } from '../components/tables/PagesTable'
+import { GaleriaCriativos } from '../components/criativos/GaleriaCriativos'
+import { CriativoModal } from '../components/criativos/CriativoModal'
 import { OrigemLeadsTable } from '../components/tables/OrigemLeadsTable'
 import { CplOrigemCard } from '../components/kpi/CplOrigemCard'
 import { TrafegoOrganicoPie } from '../components/charts/TrafegoOrganicoPie'
@@ -15,10 +17,10 @@ import { QuizCharts } from '../components/quiz/QuizCharts'
 import { SealCards } from '../components/seal/SealCards'
 import { SealDetailTable } from '../components/seal/SealDetailTable'
 import { Panel, SectionTitle } from '../components/ui/Panel'
-import { fetchTags } from '../lib/queries'
+import { fetchTags, fetchCriativos } from '../lib/queries'
 import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
-import type { Filters, Kpi, PageRow, SealResumo, TrafficRow } from '../types'
+import type { CriativoGaleria, Filters, Kpi, PageRow, SealResumo, TrafficRow } from '../types'
 
 // Cores das séries. Barras em caramelo; linhas dos combos em cores distintas
 // para dar contraste (e casar com as bolinhas ao lado do título).
@@ -143,6 +145,9 @@ const SEAL_TAG_WINDOWS: Record<string, { from: string; to: string }> = {
 const VIEWS: Record<View, { overline: string; showOrigem: boolean; from: string; to: string }> = {
   meteorico: { overline: 'Dashboard Meteórico', showOrigem: true, from: '2026-07-23', to: '2026-07-30' },
   padrao: { overline: 'Dashboard Padrão', showOrigem: false, from: '2026-07-31', to: '2026-08-21' },
+  // Galeria de criativos: abre no mesmo período do Padrão, que é onde a
+  // operação está rodando.
+  anuncios: { overline: 'Anúncios', showOrigem: false, from: '2026-07-31', to: '2026-08-21' },
   seal: { overline: 'Dashboard SEAL', showOrigem: false, from: '2026-07-23', to: '2026-08-31' },
 }
 
@@ -154,6 +159,12 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   // pausada e AINDA NÃO COMMITADA (memória: wep-thumbnail-anuncio-opcaoB).
   // Fica só no disco local até retomar; não publicar sem querer.
   const [adPreview, setAdPreview] = useState<TrafficRow | null>(null)
+  // Galeria de criativos (aba Anúncios). Carrega sob demanda: só quando a aba
+  // está aberta, para não pesar as outras telas com uma consulta que elas não
+  // usam.
+  const [criativos, setCriativos] = useState<CriativoGaleria[]>([])
+  const [criativosLoading, setCriativosLoading] = useState(false)
+  const [criativoAberto, setCriativoAberto] = useState<CriativoGaleria | null>(null)
   const [filters, setFilters] = useState<Filters>({
     tag: 'Todas',
     from: VIEWS.meteorico.from,
@@ -292,6 +303,26 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
       .catch(() => setTags([]))
   }, [])
 
+  // Criativos da aba Anúncios: recarrega quando a aba abre ou o período muda.
+  useEffect(() => {
+    if (view !== 'anuncios') return
+    let cancelado = false
+    setCriativosLoading(true)
+    fetchCriativos(filters)
+      .then((cs) => {
+        if (!cancelado) setCriativos(cs)
+      })
+      .catch(() => {
+        if (!cancelado) setCriativos([])
+      })
+      .finally(() => {
+        if (!cancelado) setCriativosLoading(false)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [view, filters.from, filters.to])
+
   const tagNames = ['Todas', ...tags.map((t) => t.tag)]
 
   // Clique numa coluna/ponto do gráfico → filtra o painel por aquele dia.
@@ -374,15 +405,33 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
         </div>
       ) : (
         <>
+          {/* Anúncios: só a galeria de criativos. Sem KPIs nem gráficos — a
+              tela responde "qual peça performa", e cards/funil dessa mesma
+              operação já estão no Padrão. */}
+          {view === 'anuncios' && (
+            <div className="mt-6">
+              {criativosLoading ? (
+                <div className="flex items-center justify-center gap-3 py-20 text-sm text-muted">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-line border-t-gold" />
+                  Carregando criativos…
+                </div>
+              ) : (
+                <GaleriaCriativos criativos={criativos} onAbrir={setCriativoAberto} />
+              )}
+            </div>
+          )}
+
           {/* KPIs (variam por etapa) */}
+          {view !== 'anuncios' && (
           <div className={`mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 ${kpiCols}`}>
             {cards.map((k) => (
               <KpiCard key={k.id} kpi={k} />
             ))}
           </div>
+          )}
 
           {/* Gráficos + funil (Meteórico/Padrão; SEAL não tem) */}
-          {view !== 'seal' && (
+          {view !== 'seal' && view !== 'anuncios' && (
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr_1fr]">
             {/* Coluna esquerda: sup = Leads|Conversão (Met) ou Vendas|CAC (Pad); inf = Entrada grupo/dia */}
             <div className="flex flex-col gap-4">
@@ -471,7 +520,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           )}
 
           {/* Análise + Pesquisa (Meteórico/Padrão) — SEAL tem seu próprio corpo */}
-          {view !== 'seal' && (
+          {view !== 'seal' && view !== 'anuncios' && (
             <div className="mt-6 flex flex-col gap-6">
               {/* Tráfego por campanha: nas duas etapas. No Padrão, as campanhas
                   ocultas já saem na origem (fn_trafego + p_excluir, via queries.ts),
@@ -542,6 +591,9 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
         </div>
       </div>
       {adPreview && <AdThumbnailModal row={adPreview} onClose={() => setAdPreview(null)} />}
+      {criativoAberto && (
+        <CriativoModal c={criativoAberto} onClose={() => setCriativoAberto(null)} />
+      )}
     </div>
   )
 }
