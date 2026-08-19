@@ -45,6 +45,15 @@ export interface CriativoGaleria {
   cac: number
   /** Em quantas campanhas a peça rodou — um CAC alto pode ser de uma delas só. */
   campanhas: number
+  /**
+   * Leitura de mídia, para separar "criativo ruim" de "entrega cara". A
+   * frequência é piso, não valor exato: o alcance vem somado por dia e
+   * campanha, e alcance não é aditivo (ver sql/76).
+   */
+  cpm: number
+  cpc: number
+  ctr: number
+  frequencia: number
 }
 
 /** Recorte por origem da captação (teste A/B: páginas vs formulário nativo). */

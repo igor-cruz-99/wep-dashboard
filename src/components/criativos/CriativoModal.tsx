@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CriativoGaleria } from '../../types'
-import { formatBRL, formatInt } from '../../utils/format'
+import { formatBRL, formatDec1, formatInt, formatPct2 } from '../../utils/format'
 
 /**
  * Preview grande do criativo, aberto pelo clique no card da galeria.
@@ -55,6 +55,11 @@ export function CriativoModal({ c, onClose }: { c: CriativoGaleria; onClose: () 
           )}
         </div>
 
+        {/* Duas leituras separadas de propósito. Em cima, o resultado: gastou
+            tanto, vendeu tanto. Embaixo, a mídia — que é o que diz SE o
+            problema é o criativo ou a entrega. CAC alto com CTR alto é
+            oferta/página; CAC alto com CTR baixo é a peça; frequência subindo
+            é audiência queimando. */}
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { label: 'Investimento', valor: formatBRL(c.investimento) },
@@ -71,9 +76,41 @@ export function CriativoModal({ c, onClose }: { c: CriativoGaleria; onClose: () 
           ))}
         </div>
 
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: 'CPM', valor: c.cpm > 0 ? formatBRL(c.cpm) : '—' },
+            { label: 'CPC', valor: c.cpc > 0 ? formatBRL(c.cpc) : '—' },
+            { label: 'CTR', valor: c.ctr > 0 ? formatPct2(c.ctr) : '—' },
+            {
+              label: 'Frequência',
+              valor: c.frequencia > 0 ? formatDec1(c.frequencia) : '—',
+              nota: c.frequencia > 0 ? 'mín.' : undefined,
+            },
+          ].map((m) => (
+            <div key={m.label} className="rounded-xl border border-line bg-card-2 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                {m.label}
+              </p>
+              <p className="text-base font-bold text-cream">
+                {m.valor}
+                {m.nota && (
+                  <span className="ml-1 text-[10px] font-normal text-muted">{m.nota}</span>
+                )}
+              </p>
+            </div>
+          ))}
+        </div>
+
         <p className="mt-3 text-[11px] text-muted">
           Somando {c.campanhas} {c.campanhas === 1 ? 'campanha' : 'campanhas'} no período. Para ver o
           desempenho separado por campanha, use a tabela de tráfego na etapa Padrão.
+          {c.frequencia > 0 && (
+            <>
+              {' '}
+              A frequência é um piso: o alcance vem somado por dia e campanha, e a mesma pessoa
+              alcançada em dias diferentes conta duas vezes — a real é um pouco maior.
+            </>
+          )}
         </p>
       </div>
     </div>

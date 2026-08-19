@@ -361,6 +361,10 @@ interface CriativoRow {
   checkouts: number
   cac: number
   campanhas: number
+  cpm: number | null
+  cpc: number | null
+  ctr: number | null
+  frequencia: number | null
 }
 
 /**
@@ -382,6 +386,10 @@ export async function fetchCriativos(filters: Filters): Promise<CriativoGaleria[
     checkouts: Number(r.checkouts),
     cac: Number(r.cac),
     campanhas: Number(r.campanhas),
+    cpm: Number(r.cpm ?? 0),
+    cpc: Number(r.cpc ?? 0),
+    ctr: Number(r.ctr ?? 0),
+    frequencia: Number(r.frequencia ?? 0),
   }))
 }
 
