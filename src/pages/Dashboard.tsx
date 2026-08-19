@@ -7,6 +7,7 @@ import { Funnel } from '../components/funnel/Funnel'
 import { TrafficTable } from '../components/tables/TrafficTable'
 import { AdThumbnailModal } from '../components/tables/AdThumbnailModal'
 import { PagesTable } from '../components/tables/PagesTable'
+import { BuyersTable } from '../components/tables/BuyersTable'
 import { GaleriaCriativos } from '../components/criativos/GaleriaCriativos'
 import { CriativoModal } from '../components/criativos/CriativoModal'
 import { OrigemLeadsTable } from '../components/tables/OrigemLeadsTable'
@@ -17,10 +18,10 @@ import { QuizCharts } from '../components/quiz/QuizCharts'
 import { SealCards } from '../components/seal/SealCards'
 import { SealDetailTable } from '../components/seal/SealDetailTable'
 import { Panel, SectionTitle } from '../components/ui/Panel'
-import { fetchTags, fetchCriativos } from '../lib/queries'
+import { fetchTags, fetchCriativos, fetchCompradores } from '../lib/queries'
 import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
-import type { CriativoGaleria, Filters, Kpi, PageRow, SealResumo, TrafficRow } from '../types'
+import type { Comprador, CriativoGaleria, Filters, Kpi, PageRow, SealResumo, TrafficRow } from '../types'
 
 // Cores das séries. Barras em caramelo; linhas dos combos em cores distintas
 // para dar contraste (e casar com as bolinhas ao lado do título).
@@ -165,6 +166,10 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const [criativos, setCriativos] = useState<CriativoGaleria[]>([])
   const [criativosLoading, setCriativosLoading] = useState(false)
   const [criativoAberto, setCriativoAberto] = useState<CriativoGaleria | null>(null)
+  // Compradores linha a linha (bloco "Vendas / Por compradores", só no Padrão).
+  // Mesmo motivo da galeria: consulta que só uma tela usa não deve pesar as
+  // outras, então carrega sob demanda em vez de entrar no useDashboardData.
+  const [compradores, setCompradores] = useState<Comprador[]>([])
   const [filters, setFilters] = useState<Filters>({
     tag: 'Todas',
     from: VIEWS.meteorico.from,
@@ -322,6 +327,23 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
       cancelado = true
     }
   }, [view, filters.from, filters.to])
+
+  // Compradores do Padrão: acompanha os mesmos filtros do topo do painel, para
+  // a contagem de linhas bater com a etapa Vendas do funil.
+  useEffect(() => {
+    if (view !== 'padrao') return
+    let cancelado = false
+    fetchCompradores(filters)
+      .then((cs) => {
+        if (!cancelado) setCompradores(cs)
+      })
+      .catch(() => {
+        if (!cancelado) setCompradores([])
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [view, filters.from, filters.to, filters.tag, filters.origem, filters.grupo])
 
   const tagNames = ['Todas', ...tags.map((t) => t.tag)]
 
@@ -554,6 +576,10 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                   colKeys={['pagina', 'pageView', 'checkout', 'vendas', 'checkoutVenda', 'visitaCheckout', 'visitaVenda']}
                 />
               )}
+
+              {/* Compradores linha a linha: a lupa por trás dos blocos
+                  agregados acima. Só no Padrão, que é a etapa de venda. */}
+              {view === 'padrao' && <BuyersTable rows={compradores} />}
 
               {/* Pesquisa: mesma pesquisa, título muda por etapa */}
               <PesquisaCharts

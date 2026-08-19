@@ -173,6 +173,27 @@ export interface SealComprador {
   utmPagina: string | null
 }
 
+/**
+ * Linha da tabela "Vendas / Por compradores": uma venda aprovada, com as UTMs
+ * inteiras. `pagina` já vem no mesmo slug da tabela de desempenho, para dar
+ * para cruzar as duas a olho.
+ */
+export interface Comprador {
+  id: number
+  nome: string | null
+  email: string | null
+  data: string | null
+  hora: string | null
+  valor: number
+  produto: string | null
+  pagina: string | null
+  utmSource: string | null
+  utmMedium: string | null
+  utmCampaign: string | null
+  utmTerm: string | null
+  utmContent: string | null
+}
+
 /** Filtros globais do painel. */
 export interface Filters {
   tag: string | null

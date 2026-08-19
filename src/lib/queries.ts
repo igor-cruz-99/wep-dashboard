@@ -1,6 +1,7 @@
 import { supabaseAuth } from './supabase'
 import { DEV_SKIP_AUTH } from './devAuth'
 import type {
+  Comprador,
   CplOrigem,
   CriativoGaleria,
   TrafegoOrganico,
@@ -139,6 +140,21 @@ interface TrafegoRow {
 interface PaginaRow { pagina: string; page_views: number; checkouts: number; vendas: number; leads: number; pesquisa: number }
 interface PerfilRow { dimensao: string; categoria: string; total: number }
 interface SealRow { situacao: string; alunos: number; valor_total: number }
+interface CompradorRow {
+  id: number
+  nome: string | null
+  email: string | null
+  data: string | null
+  hora: string | null
+  valor: number | string | null
+  produto: string | null
+  pagina: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_term: string | null
+  utm_content: string | null
+}
 interface SealCompradorRow {
   email: string
   nome: string | null
@@ -366,6 +382,40 @@ export async function fetchCriativos(filters: Filters): Promise<CriativoGaleria[
     checkouts: Number(r.checkouts),
     cac: Number(r.cac),
     campanhas: Number(r.campanhas),
+  }))
+}
+
+/**
+ * Uma linha por venda aprovada, com as UTMs inteiras — a lupa por trás dos
+ * blocos agregados. Em try/catch porque o bloco é opcional: se a migração 75
+ * ainda não rodou, a tabela some em vez de derrubar a página inteira.
+ */
+export async function fetchCompradores(filters: Filters): Promise<Comprador[]> {
+  let rows: CompradorRow[]
+  try {
+    rows =
+      (await callApi<CompradorRow[]>('fn_vendas_compradores', {
+        ...rpcParamsO(filters),
+        ...excluirParam(filters),
+      })) ?? []
+  } catch (err) {
+    console.warn('fn_vendas_compradores indisponível:', (err as Error)?.message)
+    return []
+  }
+  return rows.map((r) => ({
+    id: Number(r.id),
+    nome: r.nome,
+    email: r.email,
+    data: r.data,
+    hora: r.hora,
+    valor: Number(r.valor ?? 0),
+    produto: r.produto,
+    pagina: r.pagina,
+    utmSource: r.utm_source,
+    utmMedium: r.utm_medium,
+    utmCampaign: r.utm_campaign,
+    utmTerm: r.utm_term,
+    utmContent: r.utm_content,
   }))
 }
 
