@@ -159,6 +159,8 @@ interface SealCompradorRow {
   email: string
   nome: string | null
   situacao: string
+  valor_pago: number | string | null
+  pedidos: number | null
   data: string | null
   hora: string | null
   utm_source: string | null
@@ -574,8 +576,8 @@ export async function fetchQuizResumo(filters: Filters): Promise<{ respostas: nu
 
 // ── SEAL: situação de pagamento por aluno (2 cards) ─────────────────────────
 const SEAL_VAZIO: SealResumo = {
-  quitou: { alunos: 0, valorTotal: 0 },
-  reserva: { alunos: 0, valorTotal: 0 },
+  completa: { alunos: 0, valorTotal: 0 },
+  complemento: { alunos: 0, valorTotal: 0 },
 }
 
 /** SEAL filtra pela DATA DA COMPRA (sem tag: vendas_pagarme não tem coluna tag). */
@@ -597,7 +599,7 @@ export async function fetchSealResumo(filters: Filters): Promise<SealResumo> {
     const r = rows.find((x) => x.situacao === s)
     return { alunos: Number(r?.alunos ?? 0), valorTotal: Number(r?.valor_total ?? 0) }
   }
-  return { quitou: find('quitou'), reserva: find('reserva') }
+  return { completa: find('completa'), complemento: find('complemento') }
 }
 
 export async function fetchSealCompradores(filters: Filters): Promise<SealComprador[]> {
@@ -612,6 +614,8 @@ export async function fetchSealCompradores(filters: Filters): Promise<SealCompra
     email: r.email,
     nome: r.nome,
     situacao: r.situacao,
+    valorPago: Number(r.valor_pago ?? 0),
+    pedidos: Number(r.pedidos ?? 1),
     data: r.data,
     hora: r.hora,
     utmSource: r.utm_source,

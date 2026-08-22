@@ -44,13 +44,19 @@ const SERIES = {
 function kpisForView(view: View, kpis: Kpi[], pages: PageRow[], seal: SealResumo, entradasGrupo: number): Kpi[] {
   const by = (id: string) => kpis.find((k) => k.id === id)
   if (view === 'seal') {
-    // Cards do SEAL: Vendas Ingresso, Conversão SEAL (vendas SEAL ÷ ingressos),
-    // Investimento, CAC SEAL (investimento ÷ vendas SEAL).
+    // Cards do SEAL, na ordem: Vendas Ingresso, Vendas SEAL, Conversão SEAL,
+    // Investimento, Faturamento SEAL, CAC SEAL.
     const vendasIngresso = Number(by('vendas')?.value ?? 0)
     const investimento = Number(by('investimento')?.value ?? 0)
-    const vendasSeal = seal.quitou.alunos + seal.reserva.alunos
+    // Vendas SEAL é o TOTAL: completa + complemento. Quem pagou só uma parte
+    // já é venda — só não é venda fechada. A separação entre as duas mora nos
+    // cards de situação logo abaixo; aqui em cima o número é o agregado, e é
+    // por ele que CAC e conversão dividem.
+    const vendasSeal = seal.completa.alunos + seal.complemento.alunos
+    const faturamentoSeal = seal.completa.valorTotal + seal.complemento.valorTotal
     return [
       { id: 'vendasIngresso', label: 'Vendas Ingresso', value: vendasIngresso, format: 'int', direction: 'normal' },
+      { id: 'vendasSeal', label: 'Vendas SEAL', value: vendasSeal, format: 'int', direction: 'normal' },
       {
         id: 'conversaoSeal',
         label: 'Conversão SEAL',
@@ -59,6 +65,13 @@ function kpisForView(view: View, kpis: Kpi[], pages: PageRow[], seal: SealResumo
         direction: 'normal',
       },
       { id: 'investimentoSeal', label: 'Investimento', value: investimento, format: 'brl', direction: 'inverse' },
+      {
+        id: 'faturamentoSeal',
+        label: 'Faturamento SEAL',
+        value: faturamentoSeal,
+        format: 'brl',
+        direction: 'normal',
+      },
       {
         id: 'cacSeal',
         label: 'CAC SEAL',

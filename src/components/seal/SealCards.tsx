@@ -35,10 +35,16 @@ function SealCard({ label, sub, data, accent }: CardProps) {
   )
 }
 
-/** Card do CAC SEAL: investimento ÷ vendas completas (quitadas). */
-function CacCard({ investimento, vendasCompletas }: { investimento: number; vendasCompletas: number }) {
+/**
+ * CAC SEAL: investimento ÷ TOTAL de vendas SEAL (completas + complementos).
+ * Quem pagou só uma parte já é venda — só não é venda fechada; a separação
+ * entre as duas está nos dois cards ao lado. Usa o mesmo denominador do card
+ * "CAC SEAL" do topo, de propósito: dois números com o mesmo nome na mesma
+ * tela confundiriam mais do que informariam.
+ */
+function CacCard({ investimento, vendasSeal }: { investimento: number; vendasSeal: number }) {
   const accent = '#c9945f'
-  const cac = vendasCompletas > 0 ? investimento / vendasCompletas : null
+  const cac = vendasSeal > 0 ? investimento / vendasSeal : null
   return (
     <Panel
       className="relative overflow-hidden px-5 pb-5 pt-4"
@@ -52,36 +58,44 @@ function CacCard({ investimento, vendasCompletas }: { investimento: number; vend
       <p className="mt-2 text-4xl font-bold tracking-tight" style={{ color: accent }}>
         {cac === null ? '—' : formatBRL(cac)}
       </p>
-      <p className="mt-1 text-xs text-muted">Investimento ÷ vendas completas</p>
+      <p className="mt-1 text-xs text-muted">Investimento ÷ vendas SEAL</p>
       <p className="mt-3 text-sm text-cream">
-        {formatBRL(investimento)} <span className="text-muted">÷ {formatInt(vendasCompletas)}</span>
+        {formatBRL(investimento)} <span className="text-muted">÷ {formatInt(vendasSeal)}</span>
       </p>
-      <p className="text-[11px] text-muted">investimento ÷ quitados</p>
+      <p className="text-[11px] text-muted">completas + complementos</p>
     </Panel>
   )
 }
 
 /**
- * Bloco SEAL (roadmap item 2): cards de situação — quem quitou (pagou tudo),
- * quem pagou só a reserva, e o CAC SEAL. Agrupado por email, todas as origens.
+ * Bloco SEAL: cards de situação — quem pagou o SEAL inteiro, quem pagou só
+ * uma parte, e o CAC SEAL. Agrupado por email, todas as origens.
+ *
+ * A situação vem do VALOR pago no período (>= R$ 3.000 é completa), não do
+ * nome do produto: na origem tudo se chama "SEAL" hoje, então classificar
+ * pelo texto marcava como quitado quem tinha pago R$ 500 (ver sql/77).
+ *
  * `investimento` vem do funil (respeita o filtro de período ativo).
  */
 export function SealCards({ seal, investimento }: { seal: SealResumo; investimento: number }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <SealCard
-        label="Quitaram"
-        sub="Pagaram tudo (complemento ou à vista)"
-        data={seal.quitou}
+        label="Completas"
+        sub="Pagaram o SEAL inteiro (à vista ou somando pedidos)"
+        data={seal.completa}
         accent="#9ed08b"
       />
       <SealCard
-        label="Só reserva"
-        sub="Pagaram só a taxa de entrada"
-        data={seal.reserva}
+        label="Complemento"
+        sub="Pagaram só uma parte (abaixo de R$ 3.000)"
+        data={seal.complemento}
         accent="#e8b05c"
       />
-      <CacCard investimento={investimento} vendasCompletas={seal.quitou.alunos} />
+      <CacCard
+        investimento={investimento}
+        vendasSeal={seal.completa.alunos + seal.complemento.alunos}
+      />
     </div>
   )
 }

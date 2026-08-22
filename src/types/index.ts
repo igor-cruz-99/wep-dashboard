@@ -161,10 +161,13 @@ export interface SealSituacao {
   valorTotal: number
 }
 
-/** Resumo do SEAL para os 2 cards (roadmap item 2). */
+/**
+ * Resumo do SEAL para os 2 cards. A situação vem do VALOR pago no período
+ * (>= R$ 3.000 é completa), não do nome do produto — ver sql/77.
+ */
 export interface SealResumo {
-  quitou: SealSituacao
-  reserva: SealSituacao
+  completa: SealSituacao
+  complemento: SealSituacao
 }
 
 /** Linha da tabela de compradores SEAL (detalhada). */
@@ -172,6 +175,10 @@ export interface SealComprador {
   email: string
   nome: string | null
   situacao: string
+  /** Total pago pelo aluno NO PERÍODO — o número que define a situação. */
+  valorPago: number
+  /** Quantos pedidos somaram esse total; >1 significa que pagou em partes. */
+  pedidos: number
   data: string | null
   hora: string | null
   utmSource: string | null

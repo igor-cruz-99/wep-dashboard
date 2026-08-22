@@ -5,18 +5,22 @@ import { Panel, SectionTitle } from '../ui/Panel'
 const DASH = '—'
 const cell = (v: string | null) => (v && v.trim() !== '' ? v : DASH)
 
-/** Etiqueta colorida da situação (quitou/reserva), no padrão dos cards. */
+/**
+ * Etiqueta colorida da situação, no padrão dos cards. A situação vem do valor
+ * pago no período (>= R$ 3.000 é completa), não do nome do produto — ver
+ * sql/77.
+ */
 function SituacaoTag({ situacao }: { situacao: string }) {
-  const quitou = situacao === 'quitou'
+  const completa = situacao === 'completa'
   return (
     <span
       className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
       style={{
-        color: quitou ? '#9ed08b' : '#e8b05c',
-        background: quitou ? '#9ed08b1f' : '#e8b05c1f',
+        color: completa ? '#9ed08b' : '#e8b05c',
+        background: completa ? '#9ed08b1f' : '#e8b05c1f',
       }}
     >
-      {quitou ? 'Quitou' : 'Só reserva'}
+      {completa ? 'Completa' : 'Complemento'}
     </span>
   )
 }
