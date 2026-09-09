@@ -141,33 +141,79 @@ interface DashboardProps {
   onLogout?: () => void
 }
 
-// Config de cada etapa (visão da sidebar): título, se mostra o recorte de
-// origem e a janela de datas padrão. É a DATA que separa Meteórico de Padrão.
-// Tags que aparecem como sub-itens na sidebar. Por ora só o lançamento ativo.
-// ⚠️ AO INSERIR novos lançamentos, mantenha esta lista em ORDEM CRONOLÓGICA
-//    (ex.: ['WEPAGO26', 'WEPOUT26', 'WEPDEZ26', ...]) — é a ordem em que aparecem.
-const SIDEBAR_TAGS = ['WEPAGO26']
+// Lançamentos que aparecem como sub-itens na sidebar.
+// ⚠️ ORDEM CRONOLÓGICA — é a ordem em que aparecem, e o ÚLTIMO é tratado como
+//    a edição ativa (a que o painel abre e a que o SEAL usa como atalho).
+const SIDEBAR_TAGS = ['WEPAGO26', 'WEPSET26']
+const TAG_ATIVA = SIDEBAR_TAGS[SIDEBAR_TAGS.length - 1]
 
-// Janela de datas por lançamento para o SEAL. Como vendas_pagarme não tem tag,
-// o "filtro de tag" do SEAL é um ATALHO DE PERÍODO: cada lançamento aponta pra
-// uma janela que vai até DEPOIS do evento (onde o SEAL é vendido).
-// ⚠️ Adicionar novos lançamentos aqui (mesma ordem cronológica da SIDEBAR_TAGS).
-const SEAL_TAG_WINDOWS: Record<string, { from: string; to: string }> = {
-  WEPAGO26: { from: '2026-07-23', to: '2026-08-31' },
+/**
+ * Janela de datas por (lançamento, etapa).
+ *
+ * Por que não basta a janela da wep_tags: a tabela guarda a captação inteira
+ * do lançamento, e é a DATA que separa Meteórico de Padrão dentro dela. Em
+ * WEPAGO26 a captação vai de 01/07 a 30/08, mas o Meteórico é só a semana do
+ * evento e o Padrão é o que vem depois — usar a janela da tag jogaria os dois
+ * períodos na mesma tela.
+ *
+ * A etapa AUSENTE aqui não existe naquele lançamento, e a sidebar não oferece
+ * o lançamento dentro dela. É assim que WEPSET26 não aparece no Meteórico:
+ * esta edição não tem fase meteórica, a operação inteira roda no Padrão.
+ *
+ * O SEAL é caso à parte: vendas_pagarme não tem coluna de tag, então o
+ * "filtro de tag" do SEAL é só um atalho de período.
+ *
+ * ⚠️ AO ABRIR UM LANÇAMENTO NOVO: acrescente a entrada aqui e o nome na
+ *    SIDEBAR_TAGS. Sem a entrada, o lançamento some da sidebar.
+ */
+const TAG_WINDOWS: Record<string, Partial<Record<View, { from: string; to: string }>>> = {
+  WEPAGO26: {
+    meteorico: { from: '2026-07-23', to: '2026-07-30' },
+    padrao: { from: '2026-07-31', to: '2026-08-21' },
+    anuncios: { from: '2026-07-31', to: '2026-08-21' },
+    // SEAL vai até depois do evento, que é quando ele é vendido.
+    seal: { from: '2026-07-23', to: '2026-08-31' },
+  },
+  WEPSET26: {
+    // Sem Meteórico nesta edição — de propósito, não é esquecimento.
+    padrao: { from: '2026-09-10', to: '2026-09-20' },
+    anuncios: { from: '2026-09-10', to: '2026-09-20' },
+    seal: { from: '2026-09-10', to: '2026-09-20' },
+  },
 }
 
-const VIEWS: Record<View, { overline: string; showOrigem: boolean; from: string; to: string }> = {
-  meteorico: { overline: 'Dashboard Meteórico', showOrigem: true, from: '2026-07-23', to: '2026-07-30' },
-  padrao: { overline: 'Dashboard Padrão', showOrigem: false, from: '2026-07-31', to: '2026-08-21' },
-  // Galeria de criativos: abre no mesmo período do Padrão, que é onde a
-  // operação está rodando.
-  anuncios: { overline: 'Anúncios', showOrigem: false, from: '2026-07-31', to: '2026-08-21' },
-  seal: { overline: 'Dashboard SEAL', showOrigem: false, from: '2026-07-23', to: '2026-08-31' },
+/**
+ * Edições que não rodam o Quiz InLead. O bloco some da tela em vez de aparecer
+ * zerado — um gráfico vazio parece dado faltando, e faz procurar bug onde não
+ * há. WEPAGO26 mantém o dele, que é histórico real.
+ */
+const TAGS_SEM_QUIZ = new Set(['WEPSET26'])
+
+/** Lançamentos que têm a etapa `v` — o que a sidebar oferece dentro dela. */
+const tagsForView = (v: View) => SIDEBAR_TAGS.filter((t) => TAG_WINDOWS[t]?.[v])
+
+/**
+ * Janela de (tag, etapa), caindo para a etapa na edição ativa e, no limite,
+ * para o Padrão da ativa. O fallback existe para o painel nunca abrir sem
+ * período — se cair nele, falta uma entrada no TAG_WINDOWS.
+ */
+const janela = (tag: string | null, v: View): { from: string; to: string } =>
+  TAG_WINDOWS[tag ?? '']?.[v] ?? TAG_WINDOWS[TAG_ATIVA]?.[v] ?? TAG_WINDOWS[TAG_ATIVA].padrao!
+
+// Config de cada etapa: título e se mostra o recorte de origem. As datas vêm
+// do TAG_WINDOWS, porque dependem do lançamento.
+const VIEWS: Record<View, { overline: string; showOrigem: boolean }> = {
+  meteorico: { overline: 'Dashboard Meteórico', showOrigem: true },
+  padrao: { overline: 'Dashboard Padrão', showOrigem: false },
+  anuncios: { overline: 'Anúncios', showOrigem: false },
+  seal: { overline: 'Dashboard SEAL', showOrigem: false },
 }
 
 export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const [tags, setTags] = useState<TagWindow[]>([])
-  const [view, setView] = useState<View>('meteorico')
+  // Abre no Padrão: a edição ativa (WEPSET26) não tem fase meteórica, e é o
+  // Padrão que roda a operação inteira dela.
+  const [view, setView] = useState<View>('padrao')
   const [collapsed, setCollapsed] = useState(false)
   // Anúncio clicado na tabela de tráfego (abre o popup de preview) — feature
   // pausada e AINDA NÃO COMMITADA (memória: wep-thumbnail-anuncio-opcaoB).
@@ -183,12 +229,16 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   // Mesmo motivo da galeria: consulta que só uma tela usa não deve pesar as
   // outras, então carrega sob demanda em vez de entrar no useDashboardData.
   const [compradores, setCompradores] = useState<Comprador[]>([])
+  // Abre na edição ATIVA, não em 'Todas': com p_tag nulo a fn_kpis SOMA as
+  // metas de todas as tags da wep_tags, e somar meta de CAC de dois
+  // lançamentos não significa nada. Enquanto só WEPAGO26 tinha metas isso
+  // passava despercebido; com a segunda edição preenchida, não passa mais.
   const [filters, setFilters] = useState<Filters>({
-    tag: 'Todas',
-    from: VIEWS.meteorico.from,
-    to: VIEWS.meteorico.to,
+    tag: TAG_ATIVA,
+    from: janela(TAG_ATIVA, 'padrao').from,
+    to: janela(TAG_ATIVA, 'padrao').to,
     origem: 'todas',
-    grupo: 'pre_venda',
+    grupo: 'padrao',
     campanha: null,
     conjunto: null,
     anuncio: null,
@@ -210,13 +260,13 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
     setFilters((f) => {
       const next = { ...f, ...p }
       if (p.tag !== undefined) {
-        if (view === 'seal') {
-          // No SEAL a tag é um atalho de período (lançamento), não a janela de captação.
-          const w = SEAL_TAG_WINDOWS[p.tag ?? '']
-          if (w) {
-            next.from = w.from
-            next.to = w.to
-          }
+        // Mesma regra da sidebar: a janela é do PAR (lançamento, etapa). Se o
+        // par não estiver mapeado — tags que existem na wep_tags mas ainda não
+        // abriram, como WEPOUT26 — cai na janela de captação da tabela.
+        const mapeada = TAG_WINDOWS[p.tag ?? '']?.[view]
+        if (mapeada) {
+          next.from = mapeada.from
+          next.to = mapeada.to
         } else {
           const w = windowForTag(p.tag, tags)
           if (w.from) next.from = w.from
@@ -235,20 +285,22 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
     exitPreset()
     setView(v)
     const grupo = grupoForView(v)
-    if (v === 'seal') {
-      // SEAL: a tag é atalho de período (lançamento). Entra no lançamento ativo.
-      const tag = SIDEBAR_TAGS[0]
-      const w = SEAL_TAG_WINDOWS[tag] ?? { from: VIEWS.seal.from, to: VIEWS.seal.to }
-      setFilters((f) => ({ ...f, tag, from: w.from, to: w.to, origem: 'todas', grupo }))
-      return
-    }
-    const cfg = VIEWS[v]
+    // Mantém o lançamento em que o usuário está, se ele tiver esta etapa; senão
+    // cai na edição MAIS RECENTE que tenha. Ex.: quem está no WEPSET26 e clica
+    // em Meteórico vai para o WEPAGO26 — é o único com fase meteórica, e cair
+    // na edição ativa deixaria o Meteórico com as datas de setembro, um período
+    // em que essa etapa nem existiu.
+    const comEtapa = tagsForView(v)
+    const tag = TAG_WINDOWS[filters.tag ?? '']?.[v]
+      ? (filters.tag as string)
+      : (comEtapa[comEtapa.length - 1] ?? TAG_ATIVA)
+    const w = janela(tag, v)
     setFilters((f) => ({
       ...f,
-      tag: 'Todas',
-      from: cfg.from,
-      to: cfg.to,
-      origem: cfg.showOrigem ? f.origem : 'todas',
+      tag,
+      from: w.from,
+      to: w.to,
+      origem: VIEWS[v].showOrigem ? f.origem : 'todas',
       grupo,
     }))
   }
@@ -256,13 +308,15 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const selectTag = (v: View, tag: string) => {
     exitPreset()
     setView(v)
-    const cfg = VIEWS[v]
+    // A janela é do PAR (lançamento, etapa): trocar de edição tem que trocar o
+    // período junto, senão o WEPSET26 abriria com as datas de agosto.
+    const w = janela(tag, v)
     setFilters((f) => ({
       ...f,
       tag,
-      from: cfg.from,
-      to: cfg.to,
-      origem: cfg.showOrigem ? f.origem : 'todas',
+      from: w.from,
+      to: w.to,
+      origem: VIEWS[v].showOrigem ? f.origem : 'todas',
       grupo: grupoForView(v),
     }))
   }
@@ -377,7 +431,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
       <Sidebar
         view={view}
         activeTag={filters.tag && filters.tag !== 'Todas' ? filters.tag : null}
-        tags={SIDEBAR_TAGS.filter((t) => tags.some((x) => x.tag === t))}
+        tags={tagsForView(view).filter((t) => tags.some((x) => x.tag === t))}
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
         onSelectView={selectView}
@@ -602,12 +656,15 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                 title={view === 'padrao' ? 'Respostas dos compradores' : 'Respostas da pesquisa'}
               />
 
-              {/* Quiz InLead: mesma estrutura da Pesquisa, dados de wep_quiz. */}
-              <QuizCharts
-                perfil={data.quizPerfil}
-                respostas={data.quizResumo.respostas}
-                vendas={data.quizResumo.vendas}
-              />
+              {/* Quiz InLead: mesma estrutura da Pesquisa, dados de wep_quiz.
+                  Só nas edições que usam o quiz (ver TAGS_SEM_QUIZ). */}
+              {!TAGS_SEM_QUIZ.has(filters.tag ?? '') && (
+                <QuizCharts
+                  perfil={data.quizPerfil}
+                  respostas={data.quizResumo.respostas}
+                  vendas={data.quizResumo.vendas}
+                />
+              )}
             </div>
           )}
 
