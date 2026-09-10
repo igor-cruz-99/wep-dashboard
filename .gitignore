@@ -27,6 +27,7 @@ scripts/*
 # dos criativos se esta máquina sair de cena.
 !scripts/drive-auth.mjs
 !scripts/sync-criativos-drive.mjs
+!scripts/resolve-drive-fileid.mjs
 
 # Editor directories and files
 .vscode/*
