@@ -1,12 +1,15 @@
+import { TAXA_META } from '../../lib/taxaMeta'
 import type { Filters, Origem } from '../../types'
 
-export type Preset = '30D' | '7D' | '1D'
+export type Preset = '7D' | 'Ontem' | 'Hoje'
 
 interface HeaderProps {
   filters: Filters
   tags: string[]
   onChange: (patch: Partial<Filters>) => void
-  onClearFilters?: () => void
+  /** Taxa cobrada sobre o investimento: liga/desliga o acréscimo nos custos. */
+  taxaMeta?: boolean
+  onToggleTaxaMeta?: () => void
   activePreset?: Preset | null
   onPreset?: (p: Preset) => void
   userEmail?: string
@@ -23,7 +26,8 @@ export function Header({
   filters,
   tags,
   onChange,
-  onClearFilters,
+  taxaMeta = false,
+  onToggleTaxaMeta,
   activePreset,
   onPreset,
   userEmail,
@@ -60,18 +64,43 @@ export function Header({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        {/* Limpar filtros: volta a tag pra "Todas" e limpa o dia selecionado no gráfico */}
-        {onClearFilters && (
+        {/* Taxa Meta: acrescenta a taxa ao investimento e a tudo que deriva dele
+            (CAC, CPL, CPM, CPC, CPLV). Ligado fica em dourado cheio, para dar
+            para ver de longe que os números na tela não são o gasto puro. */}
+        {onToggleTaxaMeta && (
           <button
-            onClick={onClearFilters}
-            title="Limpar filtros (tag e dia)"
-            aria-label="Limpar filtros"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-muted transition-colors hover:border-gold/50 hover:text-cream"
+            onClick={onToggleTaxaMeta}
+            role="switch"
+            aria-checked={taxaMeta}
+            title={
+              taxaMeta
+                ? `Taxa Meta LIGADA: investimento e custos com +${Math.round(TAXA_META * 100)}%`
+                : `Taxa Meta desligada: investimento como vem da Meta, sem a taxa`
+            }
+            className={`flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3 transition-colors ${
+              taxaMeta
+                ? 'border-gold bg-gold/20 text-cream'
+                : 'border-line bg-card text-muted hover:border-gold/50 hover:text-cream'
+            }`}
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08" />
-              <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z" />
-            </svg>
+            <span
+              className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
+                taxaMeta ? 'bg-gold' : 'bg-line'
+              }`}
+              aria-hidden
+            >
+              <span
+                className={`absolute top-0.5 h-3 w-3 rounded-full bg-card transition-all ${
+                  taxaMeta ? 'left-3.5' : 'left-0.5'
+                }`}
+              />
+            </span>
+            <span className="text-xs font-semibold whitespace-nowrap">
+              Taxa Meta
+              <span className="ml-1 text-[10px] font-normal text-muted">
+                +{Math.round(TAXA_META * 100)}%
+              </span>
+            </span>
           </button>
         )}
 
@@ -137,10 +166,10 @@ export function Header({
         </div>
         )}
 
-        {/* Atalhos de período: 30D / 7D / 1D (toggle) */}
+        {/* Atalhos de período: 7D / Ontem / Hoje (toggle) */}
         {onPreset && (
           <div className="flex h-10 items-center gap-1 rounded-xl border border-line bg-card p-1">
-            {(['30D', '7D', '1D'] as Preset[]).map((pr) => (
+            {(['7D', 'Ontem', 'Hoje'] as Preset[]).map((pr) => (
               <button
                 key={pr}
                 onClick={() => onPreset(pr)}

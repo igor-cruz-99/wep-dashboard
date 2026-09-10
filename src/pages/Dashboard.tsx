@@ -19,6 +19,7 @@ import { SealCards } from '../components/seal/SealCards'
 import { SealDetailTable } from '../components/seal/SealDetailTable'
 import { Panel, SectionTitle } from '../components/ui/Panel'
 import { fetchTags, fetchCriativos, fetchCompradores } from '../lib/queries'
+import { comTaxaMeta, criativosComTaxaMeta } from '../lib/taxaMeta'
 import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
 import type { Comprador, CriativoGaleria, Filters, Kpi, PageRow, SealResumo, TrafficRow } from '../types'
@@ -215,6 +216,9 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   // Padrão que roda a operação inteira dela.
   const [view, setView] = useState<View>('padrao')
   const [collapsed, setCollapsed] = useState(false)
+  // Taxa cobrada sobre o investimento. Vale para as quatro etapas: o painel lê
+  // o gasto puro da Meta, e o botão mostra o custo real por cima dele.
+  const [taxaMeta, setTaxaMeta] = useState(false)
   // Anúncio clicado na tabela de tráfego (abre o popup de preview) — feature
   // pausada e AINDA NÃO COMMITADA (memória: wep-thumbnail-anuncio-opcaoB).
   // Fica só no disco local até retomar; não publicar sem querer.
@@ -225,6 +229,12 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const [criativos, setCriativos] = useState<CriativoGaleria[]>([])
   const [criativosLoading, setCriativosLoading] = useState(false)
   const [criativoAberto, setCriativoAberto] = useState<CriativoGaleria | null>(null)
+  // Galeria e popup passam pela mesma taxa dos outros blocos — um criativo não
+  // pode custar um valor na grade e outro no card do topo.
+  const criativosExibidos = criativosComTaxaMeta(criativos, taxaMeta)
+  const criativoExibido = criativoAberto
+    ? criativosComTaxaMeta([criativoAberto], taxaMeta)[0]
+    : null
   // Compradores linha a linha (bloco "Vendas / Por compradores", só no Padrão).
   // Mesmo motivo da galeria: consulta que só uma tela usa não deve pesar as
   // outras, então carrega sob demanda em vez de entrar no useDashboardData.
@@ -325,22 +335,44 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const toISO = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-  /** Aplica/alterna um atalho: 30D/7D/1D. Reclique volta ao período anterior. */
+  /**
+   * Aplica/alterna um atalho: 7D / Ontem / Hoje. Reclique volta ao período
+   * anterior — o atalho é um espiar rápido, não um destino.
+   *
+   * "Ontem" é o único que fecha a janela antes de hoje: é o último dia
+   * COMPLETO, sem as horas que ainda não aconteceram distorcendo médias.
+   */
   const applyPreset = (preset: Preset) => {
     if (activePreset === preset) {
       if (presetPrev) setF({ from: presetPrev.from, to: presetPrev.to })
       exitPreset()
       return
     }
-    const days = preset === '30D' ? 30 : preset === '7D' ? 7 : 1
-    const from = new Date()
-    from.setDate(from.getDate() - (days - 1))
+    const hoje = new Date()
+    const ontem = new Date()
+    ontem.setDate(ontem.getDate() - 1)
+
+    let from = hoje
+    let to = hoje
+    if (preset === '7D') {
+      const inicio = new Date()
+      inicio.setDate(inicio.getDate() - 6) // 7 dias contando hoje
+      from = inicio
+    } else if (preset === 'Ontem') {
+      from = ontem
+      to = ontem
+    }
+
     if (!activePreset) setPresetPrev({ from: filters.from, to: filters.to })
     setActivePreset(preset)
-    setF({ from: toISO(from), to: toISO(new Date()) })
+    setF({ from: toISO(from), to: toISO(to) })
   }
 
-  const { data, loading, error } = useDashboardData(filters)
+  const { data: dataBruta, loading, error } = useDashboardData(filters)
+  // A taxa entra num ponto só, entre o hook e a tela: assim nenhum bloco
+  // precisa saber que ela existe, e não há como um deles esquecer de aplicá-la
+  // e mostrar um número fora de sincronia com os vizinhos.
+  const data = dataBruta && comTaxaMeta(dataBruta, taxaMeta)
 
   // Cards do topo variam por etapa (Meteórico 7, Padrão 6, SEAL 4).
   const cards = data ? kpisForView(view, data.kpis, data.pages, data.seal, data.entradasGrupo) : []
@@ -467,7 +499,8 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
         filters={filters}
         tags={view === 'seal' ? SIDEBAR_TAGS : tagNames}
         onChange={handleChange}
-        onClearFilters={view === 'seal' ? undefined : () => handleChange({ tag: 'Todas', origem: 'todas' })}
+        taxaMeta={taxaMeta}
+        onToggleTaxaMeta={() => setTaxaMeta((t) => !t)}
         activePreset={activePreset}
         onPreset={applyPreset}
         userEmail={userEmail}
@@ -505,7 +538,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
                   Carregando criativos…
                 </div>
               ) : (
-                <GaleriaCriativos criativos={criativos} onAbrir={setCriativoAberto} />
+                <GaleriaCriativos criativos={criativosExibidos} onAbrir={setCriativoAberto} />
               )}
             </div>
           )}
@@ -687,8 +720,8 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
         </div>
       </div>
       {adPreview && <AdThumbnailModal row={adPreview} onClose={() => setAdPreview(null)} />}
-      {criativoAberto && (
-        <CriativoModal c={criativoAberto} onClose={() => setCriativoAberto(null)} />
+      {criativoExibido && (
+        <CriativoModal c={criativoExibido} onClose={() => setCriativoAberto(null)} />
       )}
     </div>
   )
