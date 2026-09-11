@@ -1,5 +1,5 @@
 /** Visões do painel (etapas do lançamento + a galeria de criativos). */
-export type View = 'meteorico' | 'padrao' | 'anuncios' | 'seal'
+export type View = 'meteorico' | 'padrao' | 'anuncios' | 'paginas' | 'seal'
 
 interface PhaseDef {
   id: View
@@ -35,12 +35,23 @@ const IconAnuncios = (
   </svg>
 )
 
+const IconPaginas = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 8.5h18" />
+    <path d="M7 12.5h10M7 16h6" strokeLinecap="round" />
+  </svg>
+)
+
 const PHASES: PhaseDef[] = [
   { id: 'meteorico', label: 'WEP – Meteórico', icon: IconMeteorico, hasTags: true },
   { id: 'padrao', label: 'WEP – Padrão', icon: IconPadrao, hasTags: true },
   // Galeria de criativos: não é etapa do lançamento, é um corte por peça.
   // Sem tags — o recorte dela é só o período.
   { id: 'anuncios', label: 'WEP – Anúncios', icon: IconAnuncios, hasTags: false },
+  // LPs da edição lado a lado (head, hero e conversão). Também sem tags: a
+  // edição vem do catálogo, e o recorte é o período.
+  { id: 'paginas', label: 'WEP – Páginas', icon: IconPaginas, hasTags: false },
   { id: 'seal', label: 'SEAL – geral', icon: IconSeal, hasTags: false },
 ]
 

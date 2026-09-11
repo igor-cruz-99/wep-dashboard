@@ -39,6 +39,7 @@ const ALLOWED_RPC = new Set([
   'fn_ad_thumbnail',
   'fn_criativos_galeria',
   'fn_vendas_compradores',
+  'fn_paginas_galeria',
 ])
 
 interface Req {

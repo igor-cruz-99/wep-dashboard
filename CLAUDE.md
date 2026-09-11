@@ -21,7 +21,7 @@ Repo: `igor-cruz-99/wep-dashboard`. **A raiz do projeto é a subpasta `WEP - DAS
 - **Sondar o banco:** script `.mjs` importando supabase-js de `node_modules`, lendo `.env.local`, service_role, schema `mkt_wep` (`.schema('core')` p/ core.vendas_pagarme).
 
 ## Etapas (sidebar)
-`view`: `meteorico` | `padrao` | `seal`. O que separa Meteórico de Padrão é a **data** (não a tag). `filters.grupo === 'padrao'` identifica exatamente a etapa Padrão (Meteórico/SEAL usam `pre_venda`).
+`view`: `meteorico` | `padrao` | `seal`. O que separa Meteórico de Padrão é a **data** (não a tag). `filters.grupo === 'padrao'` vale no Padrão **e na seção Páginas** (que precisa dos mesmos filtros de consulta para o connect rate bater com o do funil); Meteórico/SEAL/Anúncios usam `pre_venda`. Para decidir o que DESENHAR, use `view`, nunca `grupo`.
 
 ## Convenções
 pt-BR. Explicações curtas por padrão (detalhar só se o Igor pedir). Verificar antes de afirmar; sinalizar risco sem decidir por ele.

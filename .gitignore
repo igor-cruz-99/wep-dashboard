@@ -28,6 +28,7 @@ scripts/*
 !scripts/drive-auth.mjs
 !scripts/sync-criativos-drive.mjs
 !scripts/resolve-drive-fileid.mjs
+!scripts/capturar-hero-paginas.mjs
 
 # Editor directories and files
 .vscode/*

@@ -10,6 +10,8 @@ import { PagesTable } from '../components/tables/PagesTable'
 import { BuyersTable } from '../components/tables/BuyersTable'
 import { GaleriaCriativos } from '../components/criativos/GaleriaCriativos'
 import { CriativoModal } from '../components/criativos/CriativoModal'
+import { PaginasGaleria } from '../components/paginas/PaginasGaleria'
+import { PaginaModal } from '../components/paginas/PaginaModal'
 import { OrigemLeadsTable } from '../components/tables/OrigemLeadsTable'
 import { CplOrigemCard } from '../components/kpi/CplOrigemCard'
 import { TrafegoOrganicoPie } from '../components/charts/TrafegoOrganicoPie'
@@ -18,11 +20,11 @@ import { QuizCharts } from '../components/quiz/QuizCharts'
 import { SealCards } from '../components/seal/SealCards'
 import { SealDetailTable } from '../components/seal/SealDetailTable'
 import { Panel, SectionTitle } from '../components/ui/Panel'
-import { fetchTags, fetchCriativos, fetchCompradores } from '../lib/queries'
+import { fetchTags, fetchCriativos, fetchCompradores, fetchPaginasGaleria } from '../lib/queries'
 import { comTaxaMeta, criativosComTaxaMeta } from '../lib/taxaMeta'
 import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
-import type { Comprador, CriativoGaleria, Filters, Kpi, PageRow, SealResumo, TrafficRow } from '../types'
+import type { Comprador, CriativoGaleria, Filters, Kpi, PageRow, PaginaGaleria, SealResumo, TrafficRow } from '../types'
 
 // Cores das séries. Barras em caramelo; linhas dos combos em cores distintas
 // para dar contraste (e casar com as bolinhas ao lado do título).
@@ -179,6 +181,8 @@ const TAG_WINDOWS: Record<string, Partial<Record<View, { from: string; to: strin
     // Sem Meteórico nesta edição — de propósito, não é esquecimento.
     padrao: { from: '2026-09-10', to: '2026-09-20' },
     anuncios: { from: '2026-09-10', to: '2026-09-20' },
+    // Seção Páginas só onde existe catálogo de LPs (sql/81) — o WEPAGO26 não tem.
+    paginas: { from: '2026-09-10', to: '2026-09-20' },
     seal: { from: '2026-09-10', to: '2026-09-20' },
   },
 }
@@ -207,6 +211,7 @@ const VIEWS: Record<View, { overline: string; showOrigem: boolean }> = {
   meteorico: { overline: 'Dashboard Meteórico', showOrigem: true },
   padrao: { overline: 'Dashboard Padrão', showOrigem: false },
   anuncios: { overline: 'Anúncios', showOrigem: false },
+  paginas: { overline: 'Páginas', showOrigem: false },
   seal: { overline: 'Dashboard SEAL', showOrigem: false },
 }
 
@@ -239,6 +244,10 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   // Mesmo motivo da galeria: consulta que só uma tela usa não deve pesar as
   // outras, então carrega sob demanda em vez de entrar no useDashboardData.
   const [compradores, setCompradores] = useState<Comprador[]>([])
+  // LPs da seção Páginas: sob demanda, pelo mesmo motivo da galeria.
+  const [paginas, setPaginas] = useState<PaginaGaleria[]>([])
+  const [paginasLoading, setPaginasLoading] = useState(false)
+  const [paginaAberta, setPaginaAberta] = useState<PaginaGaleria | null>(null)
   // Abre na edição ATIVA, não em 'Todas': com p_tag nulo a fn_kpis SOMA as
   // metas de todas as tags da wep_tags, e somar meta de CAC de dois
   // lançamentos não significa nada. Enquanto só WEPAGO26 tinha metas isso
@@ -289,7 +298,11 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
 
   /** Troca de etapa pela sidebar: ajusta título, origem e a janela de datas. */
   // Grupo de WhatsApp por etapa (Padrão usa o grupo padrão; resto o pré-venda).
-  const grupoForView = (v: View): Filters['grupo'] => (v === 'padrao' ? 'padrao' : 'pre_venda')
+  // Páginas usa o grupo do Padrão: a seção é da operação de venda direta da
+  // edição, e com o mesmo grupo as consultas aplicam os mesmos filtros (como a
+  // exclusão de campanha) — o connect rate dela tem que ser o do funil do Padrão.
+  const grupoForView = (v: View): Filters['grupo'] =>
+    v === 'padrao' || v === 'paginas' ? 'padrao' : 'pre_venda'
 
   const selectView = (v: View) => {
     exitPreset()
@@ -444,6 +457,26 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
     }
   }, [view, filters.from, filters.to, filters.tag, filters.origem, filters.grupo])
 
+  // Páginas: recarrega quando a aba abre, o período muda ou a edição muda.
+  useEffect(() => {
+    if (view !== 'paginas') return
+    let cancelado = false
+    setPaginasLoading(true)
+    fetchPaginasGaleria(filters)
+      .then((ps) => {
+        if (!cancelado) setPaginas(ps)
+      })
+      .catch(() => {
+        if (!cancelado) setPaginas([])
+      })
+      .finally(() => {
+        if (!cancelado) setPaginasLoading(false)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [view, filters.from, filters.to, filters.tag])
+
   const tagNames = ['Todas', ...tags.map((t) => t.tag)]
 
   // Clique numa coluna/ponto do gráfico → filtra o painel por aquele dia.
@@ -543,8 +576,28 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
             </div>
           )}
 
+          {/* Páginas: as LPs da edição lado a lado. Sem KPIs nem gráficos, pelo
+              mesmo motivo da galeria — a pergunta aqui é qual promessa converte,
+              e o agregado da operação já está no Padrão. */}
+          {view === 'paginas' && (
+            <div className="mt-6">
+              {paginasLoading ? (
+                <div className="flex items-center justify-center gap-3 py-20 text-sm text-muted">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-line border-t-gold" />
+                  Carregando páginas…
+                </div>
+              ) : (
+                <PaginasGaleria
+                  paginas={paginas}
+                  onAbrir={setPaginaAberta}
+                  connectRate={{ landingPageViews: data.landingPageViews, linkCliques: data.linkCliques }}
+                />
+              )}
+            </div>
+          )}
+
           {/* KPIs (variam por etapa) */}
-          {view !== 'anuncios' && (
+          {view !== 'anuncios' && view !== 'paginas' && (
           <div className={`mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 ${kpiCols}`}>
             {cards.map((k) => (
               <KpiCard key={k.id} kpi={k} />
@@ -553,7 +606,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           )}
 
           {/* Gráficos + funil (Meteórico/Padrão; SEAL não tem) */}
-          {view !== 'seal' && view !== 'anuncios' && (
+          {view !== 'seal' && view !== 'anuncios' && view !== 'paginas' && (
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr_1fr]">
             {/* Coluna esquerda: sup = Leads|Conversão (Met) ou Vendas|CAC (Pad); inf = Entrada grupo/dia */}
             <div className="flex flex-col gap-4">
@@ -642,7 +695,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
           )}
 
           {/* Análise + Pesquisa (Meteórico/Padrão) — SEAL tem seu próprio corpo */}
-          {view !== 'seal' && view !== 'anuncios' && (
+          {view !== 'seal' && view !== 'anuncios' && view !== 'paginas' && (
             <div className="mt-6 flex flex-col gap-6">
               {/* Tráfego por campanha: nas duas etapas. No Padrão, as campanhas
                   ocultas já saem na origem (fn_trafego + p_excluir, via queries.ts),
@@ -723,6 +776,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
       {criativoExibido && (
         <CriativoModal c={criativoExibido} onClose={() => setCriativoAberto(null)} />
       )}
+      {paginaAberta && <PaginaModal p={paginaAberta} onClose={() => setPaginaAberta(null)} />}
     </div>
   )
 }

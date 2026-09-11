@@ -56,6 +56,31 @@ export interface CriativoGaleria {
   frequencia: number
 }
 
+/**
+ * LP da seção "WEP – Páginas": a página do catálogo (sql/81) com o desempenho
+ * no período. `heroMobileUrl` e `heroUrl` são prints do topo da página no
+ * celular e no desktop, tirados com GTM e Pixel bloqueados — abrir o card não
+ * conta visita.
+ */
+export interface PaginaGaleria {
+  pagina: string
+  tag: string
+  lp: string
+  /** Headline testada: 'h1' | 'h2' | 'h3'. */
+  variante: string
+  singleShot: boolean
+  head: string
+  link: string
+  heroUrl: string | null
+  heroMobileUrl: string | null
+  pageViews: number
+  checkouts: number
+  vendas: number
+  visitaCheckout: number
+  visitaVenda: number
+  checkoutVenda: number
+}
+
 /** Recorte por origem da captação (teste A/B: páginas vs formulário nativo). */
 export type Origem = 'todas' | 'pagina' | 'nativo'
 

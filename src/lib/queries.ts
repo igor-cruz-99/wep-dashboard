@@ -10,6 +10,7 @@ import type {
   Kpi,
   OrigemLeadRow,
   PageRow,
+  PaginaGaleria,
   PerfilDatum,
   PesquisaPerfil,
   QuizPerfil,
@@ -392,6 +393,57 @@ export async function fetchCriativos(filters: Filters): Promise<CriativoGaleria[
     cpc: Number(r.cpc ?? 0),
     ctr: Number(r.ctr ?? 0),
     frequencia: Number(r.frequencia ?? 0),
+  }))
+}
+
+// ── Seção Páginas ───────────────────────────────────────────────────────────
+interface PaginaGaleriaRow {
+  pagina: string
+  tag: string
+  lp: string
+  variante: string
+  single_shot: boolean
+  head: string
+  link: string
+  hero_url: string | null
+  hero_mobile_url?: string | null
+  page_views: number | string
+  checkouts: number | string
+  vendas: number | string
+  visita_checkout: number | string
+  visita_venda: number | string
+  checkout_venda: number | string
+}
+
+/**
+ * LPs do catálogo da edição com o desempenho no período. Em try/catch, como os
+ * outros blocos opcionais: sem a migração 81, a seção fica vazia em vez de
+ * derrubar o painel. Sem a 82, só falta o print de celular.
+ */
+export async function fetchPaginasGaleria(filters: Filters): Promise<PaginaGaleria[]> {
+  let rows: PaginaGaleriaRow[]
+  try {
+    rows = (await callApi<PaginaGaleriaRow[]>('fn_paginas_galeria', rpcParams(filters))) ?? []
+  } catch (err) {
+    console.warn('fn_paginas_galeria indisponível:', (err as Error)?.message)
+    return []
+  }
+  return rows.map((r) => ({
+    pagina: r.pagina,
+    tag: r.tag,
+    lp: r.lp,
+    variante: r.variante,
+    singleShot: Boolean(r.single_shot),
+    head: r.head,
+    link: r.link,
+    heroUrl: r.hero_url,
+    heroMobileUrl: r.hero_mobile_url ?? null,
+    pageViews: Number(r.page_views ?? 0),
+    checkouts: Number(r.checkouts ?? 0),
+    vendas: Number(r.vendas ?? 0),
+    visitaCheckout: Number(r.visita_checkout ?? 0),
+    visitaVenda: Number(r.visita_venda ?? 0),
+    checkoutVenda: Number(r.checkout_venda ?? 0),
   }))
 }
 
