@@ -371,8 +371,9 @@ interface CriativoRow {
 }
 
 /**
- * Criativos com mídia e gasto no período, um por peça (soma as campanhas).
- * Já vem ordenado por investimento na RPC.
+ * Anúncios com gasto no período, um por peça (soma as campanhas) — com ou sem
+ * mídia no catálogo (sem mídia: url e videoUrl nulos, sql/83). Já vem ordenado
+ * por investimento na RPC.
  */
 export async function fetchCriativos(filters: Filters): Promise<CriativoGaleria[]> {
   const data = await callApi<CriativoRow[]>('fn_criativos_galeria', {

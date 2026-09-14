@@ -51,7 +51,7 @@ export function CriativoModal({ c, onClose }: { c: CriativoGaleria; onClose: () 
           ) : c.url ? (
             <img src={c.url} alt={c.adName} className="max-h-[58vh] w-full rounded-xl object-contain" />
           ) : (
-            <p className="px-4 py-10 text-center text-xs text-muted">Sem mídia disponível.</p>
+            <p className="px-4 py-10 text-center text-xs text-muted">Criativo não encontrado no catálogo de mídia.</p>
           )}
         </div>
 

@@ -71,8 +71,15 @@ function Card({ c, onAbrir }: { c: CriativoGaleria; onAbrir: () => void }) {
             onError={() => setErro(true)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center px-4 text-center text-xs text-muted">
-            {erro ? 'não foi possível carregar a mídia' : 'sem mídia'}
+          // Anúncio que rodou na Meta mas não tem imagem/vídeo no catálogo: entra
+          // na grade mesmo assim, para o gasto e as vendas dele contarem no total.
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-muted">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="3" y="4" width="18" height="16" rx="2" stroke="#a3907a" strokeWidth="1.6" />
+              <path d="m3 16 5-5 4 4 3-3 6 6" stroke="#a3907a" strokeWidth="1.6" strokeLinejoin="round" />
+              <path d="M4 4l16 16" stroke="#a3907a" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span className="text-xs">{erro ? 'não foi possível carregar a mídia' : 'criativo não encontrado'}</span>
           </div>
         )}
         {c.videoUrl && (
@@ -186,7 +193,7 @@ export function GaleriaCriativos({
         <p className="py-12 text-center text-sm text-muted">
           {busca
             ? `Nenhum anúncio com "${busca}".`
-            : 'Nenhum criativo com mídia e investimento no período.'}
+            : 'Nenhum anúncio com investimento no período.'}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

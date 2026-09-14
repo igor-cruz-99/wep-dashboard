@@ -24,7 +24,7 @@ import { fetchTags, fetchCriativos, fetchCompradores, fetchPaginasGaleria } from
 import { comTaxaMeta, criativosComTaxaMeta } from '../lib/taxaMeta'
 import type { TagWindow } from '../lib/queries'
 import { useDashboardData } from '../hooks/useDashboardData'
-import type { Comprador, CriativoGaleria, Filters, Kpi, PageRow, PaginaGaleria, SealResumo, TrafficRow } from '../types'
+import type { Comprador, CriativoGaleria, Filters, FunnelStage, Kpi, PaginaGaleria, SealResumo, TrafficRow } from '../types'
 
 // Cores das séries. Barras em caramelo; linhas dos combos em cores distintas
 // para dar contraste (e casar com as bolinhas ao lado do título).
@@ -42,9 +42,9 @@ const SERIES = {
  *  - Meteórico: os 7 atuais (Investimento, Leads, CPL, Vendas, CAC, Grupo, Qualif.).
  *  - Padrão: Investimento, Vendas, CAC, Entrada Grupo (grupo padrão ainda não
  *    criado → "—"), Qualificação, Conversão Página (vendas ÷ page views das
- *    páginas de venda — calculado no front, sem tocar no banco).
+ *    etapas do funil — o mesmo número da "Conversão Página" do funil).
  */
-function kpisForView(view: View, kpis: Kpi[], pages: PageRow[], seal: SealResumo, entradasGrupo: number): Kpi[] {
+function kpisForView(view: View, kpis: Kpi[], funnel: FunnelStage[], seal: SealResumo, entradasGrupo: number): Kpi[] {
   const by = (id: string) => kpis.find((k) => k.id === id)
   if (view === 'seal') {
     // Cards do SEAL, na ordem: Vendas Ingresso, Vendas SEAL, Conversão SEAL,
@@ -87,9 +87,13 @@ function kpisForView(view: View, kpis: Kpi[], pages: PageRow[], seal: SealResumo
     ]
   }
   if (view === 'padrao') {
-    const vend = pages.filter((p) => /vend|-pv-/i.test(p.pagina))
-    const pv = vend.reduce((s, p) => s + p.pageView, 0)
-    const vd = vend.reduce((s, p) => s + p.vendas, 0)
+    // Mesmos Page Views e Vendas do funil (fn_funil com p_so_vendas), para o
+    // card e a "Conversão Página" do funil serem um número só. Antes o card
+    // filtrava as páginas por /vend|-pv-/ no slug — as LPs da WEPSET26
+    // (workshop-estrategista-patrimonial-lp01-h1-…) não casam, e o card dava 0%.
+    const etapa = (label: string) => Number(funnel.find((s) => s.label === label)?.value ?? 0)
+    const pv = etapa('Page Views')
+    const vd = etapa('Vendas')
     const conversaoPagina: Kpi = {
       id: 'conversaoPagina',
       label: 'Conversão Página',
@@ -388,7 +392,7 @@ export function Dashboard({ userEmail, onLogout }: DashboardProps) {
   const data = dataBruta && comTaxaMeta(dataBruta, taxaMeta)
 
   // Cards do topo variam por etapa (Meteórico 7, Padrão 6, SEAL 4).
-  const cards = data ? kpisForView(view, data.kpis, data.pages, data.seal, data.entradasGrupo) : []
+  const cards = data ? kpisForView(view, data.kpis, data.funnel, data.seal, data.entradasGrupo) : []
   const kpiCols =
     cards.length >= 7 ? 'lg:grid-cols-7' : cards.length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-6'
 
