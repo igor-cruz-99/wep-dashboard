@@ -1,4 +1,4 @@
-import { TAXA_META } from '../../lib/taxaMeta'
+import { TAXA_META_ROTULO } from '../../lib/taxaMeta'
 import type { Filters, Origem } from '../../types'
 
 export type Preset = '7D' | 'Ontem' | 'Hoje'
@@ -74,7 +74,7 @@ export function Header({
             aria-checked={taxaMeta}
             title={
               taxaMeta
-                ? `Taxa Meta LIGADA: investimento e custos com +${Math.round(TAXA_META * 100)}%`
+                ? `Taxa Meta LIGADA: investimento e custos com +${TAXA_META_ROTULO}%`
                 : `Taxa Meta desligada: investimento como vem da Meta, sem a taxa`
             }
             className={`flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3 transition-colors ${
@@ -98,7 +98,7 @@ export function Header({
             <span className="text-xs font-semibold whitespace-nowrap">
               Taxa Meta
               <span className="ml-1 text-[10px] font-normal text-muted">
-                +{Math.round(TAXA_META * 100)}%
+                +{TAXA_META_ROTULO}%
               </span>
             </span>
           </button>

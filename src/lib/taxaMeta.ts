@@ -6,7 +6,12 @@ import type { CriativoGaleria } from '../types'
  * Meta, que é o valor ANTES da taxa — ligar o botão mostra o custo real da
  * operação.
  */
-export const TAXA_META = 0.12
+export const TAXA_META = 0.1215
+
+/** "12,15%" — o rótulo do botão, sem arredondar as casas decimais. */
+export const TAXA_META_ROTULO = (TAXA_META * 100).toLocaleString('pt-BR', {
+  maximumFractionDigits: 2,
+})
 
 /** Multiplicador aplicado ao investimento quando o botão está ligado. */
 const fator = (ligado: boolean) => (ligado ? 1 + TAXA_META : 1)
@@ -19,7 +24,7 @@ const fator = (ligado: boolean) => (ligado ? 1 + TAXA_META : 1)
  * CPC = inv/cliques, CPLV = inv/page views. O denominador de todas elas é
  * volume (vendas, leads, impressões), que a taxa não muda. Então
  *
- *     (inv × 1,12) / volume  =  (inv / volume) × 1,12
+ *     (inv × 1,1215) / volume  =  (inv / volume) × 1,1215
  *
  * e multiplicar o resultado pronto dá exatamente o mesmo que recalcular com o
  * investimento acrescido. Isso importa porque várias dessas métricas já vêm
